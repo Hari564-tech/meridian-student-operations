@@ -1,0 +1,34 @@
+# Dependencies
+node_modules/
+.pnp
+.pnp.js
+.node_modules.lock
+
+# Build & deployment outputs
+.vercel
+dist/
+build/
+.output/
+.tanstack/
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Editor & OS files
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Large attachments & temp artifacts
+attachments/
+artifacts/
+screenshots/

@@ -14,7 +14,7 @@ export const Route = createRootRoute({
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
       { title: APP_NAME },
-      { name: "theme-color", content: "#2563EB" },
+      { name: "theme-color", content: "#FFFFFF" },
       {
         name: "description",
         content: "Abroad Aspirants — student operations, applications, and payments in one workspace.",

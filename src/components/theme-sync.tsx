@@ -2,8 +2,8 @@ import { useEffect } from "react";
 import { useAppStore } from "@/lib/store";
 
 function applyTheme(theme: "light" | "dark" | "system") {
-  const dark =
-    theme === "dark" || (theme !== "light" && window.matchMedia("(prefers-color-scheme: dark)").matches);
+  // System default color is white (light mode). Dark mode is active only when explicitly selected as "dark".
+  const dark = theme === "dark";
   document.documentElement.classList.toggle("dark", dark);
 }
 
@@ -11,10 +11,6 @@ export function ThemeSync() {
   const theme = useAppStore((s) => s.theme);
   useEffect(() => {
     applyTheme(theme);
-    const mq = window.matchMedia("(prefers-color-scheme: dark)");
-    const onChange = () => applyTheme(theme);
-    mq.addEventListener("change", onChange);
-    return () => mq.removeEventListener("change", onChange);
   }, [theme]);
   return null;
 }

@@ -31,5 +31,7 @@
 - [x] Dynamic CSV Export includes `documentStatus` and `documentCount`
 - [x] Column Settings visibility integration for Document Status
 - [x] Dedicated Playwright E2E Suite (`scripts/verify-document-receipt-workflow.mjs`: 100% passed)
+- [x] System default colour configured to white (Light theme default in store, pure white background `#ffffff`, system theme defaults to white, meta theme-color `#ffffff`)
 - [x] 100% Passing Tests (`npm test`: 68 tests passing; `npm run typecheck`: 0 errors; `npm run build`: 0 errors)
+
 

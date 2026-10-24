@@ -302,7 +302,7 @@ export const useAppStore = create<AppStore>()(
     (set, get) => ({
       hydrated: false,
       currentUser: null,
-      theme: "system",
+      theme: "light",
       sidebarCollapsed: false,
       students: seed.students,
       employees: seed.employees,

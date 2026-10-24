@@ -272,9 +272,9 @@ function EmailComposer({
   onSend: () => void;
 }) {
   const [to, setTo] = useState(email);
-  const [subject, setSubject] = useState("Complete your Meridian document submission");
+  const [subject, setSubject] = useState("Complete your Abroad Aspirants document submission");
   const [message, setMessage] = useState(
-    `Hello ${student.name.split(" ")[0]},\n\nPlease use the Meridian student document portal to upload your pending documents.\n\nPortal:\n${url}\n\nThank you,\nMeridian Student Operations`,
+    `Hello ${student.name.split(" ")[0]},\n\nPlease use the Abroad Aspirants student document portal to upload your pending documents.\n\nPortal:\n${url}\n\nThank you,\nAbroad Aspirants Student Operations`,
   );
   return (
     <div className="grid gap-4">

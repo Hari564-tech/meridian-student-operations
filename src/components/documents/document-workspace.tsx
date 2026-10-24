@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { FilePlus2, Link2, Upload } from "lucide-react";
+import { Archive, FilePlus2, Link2, Upload } from "lucide-react";
 import { PageHeader } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -11,6 +11,8 @@ import { DocumentDetailsDrawer } from "@/components/documents/document-details-d
 import { DocumentRequestModal } from "@/components/documents/document-request-modal";
 import { PortalShareDrawer } from "@/components/documents/portal-share-drawer";
 import { PortalLink } from "@/components/documents/portal-link";
+import { DocumentArchiveDialog } from "@/components/documents/document-archive-dialog";
+import { DocumentReceiptStatusCard } from "@/components/documents/document-receipt-card";
 import { documentStats, portalEffectiveStatus, DOCUMENT_TYPE_CATALOG } from "@/lib/documents";
 import { useAppStore } from "@/lib/store";
 import type { Student, StudentDocument } from "@/lib/types";
@@ -39,18 +41,19 @@ export function DocumentWorkspace({
   const [active, setActive] = useState<StudentDocument | null>(null);
   const [requestOpen, setRequestOpen] = useState(false);
   const [portalOpen, setPortalOpen] = useState(false);
+  const [archiveOpen, setArchiveOpen] = useState(false);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
-    const uploadFlag = sessionStorage.getItem(`meridian-upload-${student.id}`);
-    const portalFlag = sessionStorage.getItem(`meridian-portal-${student.id}`);
+    const uploadFlag = sessionStorage.getItem(`aa-upload-${student.id}`);
+    const portalFlag = sessionStorage.getItem(`aa-portal-${student.id}`);
     if (uploadFlag) {
-      sessionStorage.removeItem(`meridian-upload-${student.id}`);
+      sessionStorage.removeItem(`aa-upload-${student.id}`);
       seed(student.id);
       setUploadOpen(true);
     }
     if (portalFlag) {
-      sessionStorage.removeItem(`meridian-portal-${student.id}`);
+      sessionStorage.removeItem(`aa-portal-${student.id}`);
       seed(student.id);
       setPortalOpen(true);
     }
@@ -77,12 +80,18 @@ export function DocumentWorkspace({
             title="Documents"
             description="Upload, manage and collect documents for this student."
             actions={
-              <Button onClick={openPortal}>
-                <Link2 className="size-4" /> Generate student upload link
-              </Button>
+              <div className="flex flex-wrap gap-2">
+                <Button onClick={openPortal}>
+                  <Link2 className="size-4" /> Generate student upload link
+                </Button>
+                <Button variant="outline" onClick={() => setArchiveOpen(true)}>
+                  <Archive className="size-4" /> Download All Documents (.ZIP)
+                </Button>
+              </div>
             }
           />
         )}
+        <DocumentReceiptStatusCard student={student} documents={documents} />
         <EmptyState
           icon={Upload}
           title="No documents uploaded yet."
@@ -93,7 +102,7 @@ export function DocumentWorkspace({
             setUploadOpen(true);
           }}
         />
-        <div className="flex justify-center">
+        <div className="flex justify-center gap-2">
           <Button
             variant="outline"
             onClick={() => {
@@ -103,9 +112,18 @@ export function DocumentWorkspace({
           >
             Generate portal
           </Button>
+          <Button variant="outline" onClick={() => setArchiveOpen(true)}>
+            <Archive className="size-4" /> Download All Documents (.ZIP)
+          </Button>
         </div>
         <DocumentUpload open={uploadOpen} onOpenChange={setUploadOpen} student={student} />
         <PortalShareDrawer open={portalOpen} onOpenChange={setPortalOpen} student={student} />
+        <DocumentArchiveDialog
+          open={archiveOpen}
+          onOpenChange={setArchiveOpen}
+          student={student}
+          documents={documents}
+        />
       </div>
     );
   }
@@ -125,6 +143,9 @@ export function DocumentWorkspace({
             <Button size="sm" onClick={openPortal}>
               <Link2 className="size-4" /> Generate student upload link
             </Button>
+            <Button variant="outline" size="sm" onClick={() => setArchiveOpen(true)}>
+              <Archive className="size-4" /> Download All Documents (.ZIP)
+            </Button>
           </div>
         </div>
       ) : (
@@ -139,10 +160,15 @@ export function DocumentWorkspace({
               <Button onClick={openPortal}>
                 <Link2 className="size-4" /> Generate student upload link
               </Button>
+              <Button variant="outline" onClick={() => setArchiveOpen(true)}>
+                <Archive className="size-4" /> Download All Documents (.ZIP)
+              </Button>
             </>
           }
         />
       )}
+
+      <DocumentReceiptStatusCard student={student} documents={documents} />
 
       <Card className="p-5">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
@@ -242,6 +268,12 @@ export function DocumentWorkspace({
       />
       <DocumentRequestModal open={requestOpen} onOpenChange={setRequestOpen} student={student} />
       <PortalShareDrawer open={portalOpen} onOpenChange={setPortalOpen} student={student} />
+      <DocumentArchiveDialog
+        open={archiveOpen}
+        onOpenChange={setArchiveOpen}
+        student={student}
+        documents={documents}
+      />
     </div>
   );
 }

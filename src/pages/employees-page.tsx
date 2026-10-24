@@ -239,7 +239,7 @@ export function EmployeesPage() {
                 autoComplete="off"
                 value={form.email}
                 onChange={(e) => patch({ email: e.target.value })}
-                placeholder="name@meridian.edu"
+                placeholder="name@abroadaspirants.com"
               />
             </FormField>
             <FormField label="Password" required>

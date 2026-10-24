@@ -2,26 +2,47 @@ import { cn } from "@/lib/utils";
 
 export function LogoMark({ className }: { className?: string }) {
   return (
-    <svg viewBox="0 0 32 32" fill="none" className={cn("size-7", className)} aria-hidden>
-      <rect width="32" height="32" rx="8" className="fill-primary" />
-      <path
-        d="M16 6.5 L16 25.5 M16 6.5 L19.2 11.2 M16 6.5 L12.8 11.2 M8.5 16 H23.5 M8.5 16 L12.2 13.2 M8.5 16 L12.2 18.8 M23.5 16 L19.8 13.2 M23.5 16 L19.8 18.8"
-        stroke="white"
-        strokeWidth="1.7"
-        strokeLinecap="round"
+    <div
+      className={cn(
+        "relative flex size-8 shrink-0 items-center justify-center overflow-hidden",
+        className,
+      )}
+      aria-label="Abroad Aspirants mark"
+    >
+      <img
+        src="/brand/logo-mark.svg"
+        alt="Abroad Aspirants"
+        className="h-full w-full object-contain"
+        loading="eager"
       />
-      <circle cx="16" cy="16" r="2.2" fill="white" />
-    </svg>
+    </div>
   );
 }
 
-export function Logo({ compact = false, className }: { compact?: boolean; className?: string }) {
+export function Logo({
+  compact = false,
+  className,
+  showSubtitle = false,
+}: {
+  compact?: boolean;
+  className?: string;
+  showSubtitle?: boolean;
+}) {
+  if (compact) {
+    return <LogoMark className={className} />;
+  }
+
   return (
-    <div className={cn("flex items-center gap-2.5", className)}>
-      <LogoMark />
-      {!compact && (
+    <div className={cn("inline-flex items-center gap-2.5", className)}>
+      <img
+        src="/brand/logo.svg"
+        alt="Abroad Aspirants"
+        className="h-8 w-auto max-w-[146px] object-contain"
+        loading="eager"
+      />
+      {showSubtitle && (
         <div className="leading-tight">
-          <div className="text-sm font-semibold tracking-tight text-foreground">Meridian</div>
+          <div className="text-sm font-semibold tracking-tight text-foreground">Abroad Aspirants</div>
           <div className="text-micro text-muted-foreground">Student operations</div>
         </div>
       )}

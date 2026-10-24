@@ -194,7 +194,7 @@ function actorSnapshot(state: { currentUser: User | null }) {
     userId: user?.id ?? "system",
     role: (user?.role ?? "admin") as AuditEvent["role"],
     ip: "192.168.14.22",
-    userAgent: typeof navigator !== "undefined" ? navigator.userAgent.slice(0, 48) : "Meridian Web",
+    userAgent: typeof navigator !== "undefined" ? navigator.userAgent.slice(0, 48) : "Abroad Aspirants Web",
   };
 }
 
@@ -1413,7 +1413,7 @@ export const useAppStore = create<AppStore>()(
       },
     }),
     {
-      name: "meridian-docs-v3",
+      name: "abroad-aspirants-docs-v1",
       storage: createJSONStorage(credentialStorage),
       skipHydration: true,
       partialize: (s) => ({

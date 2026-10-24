@@ -1,4 +1,9 @@
 import { matchAllUniversities } from "@/lib/eligibility";
+import {
+  RECEIPT_LOGO_HEIGHT,
+  RECEIPT_LOGO_WIDTH,
+  getReceiptLogoBytes,
+} from "@/lib/receipt-logo-data";
 import type { Student, University } from "@/lib/types";
 
 export interface EligibleProgram {
@@ -181,31 +186,10 @@ class Page {
   line(x1: number, y1: number, x2: number, y2: number) {
     this.ops.push(`${num(x1)} ${num(y1)} m ${num(x2)} ${num(y2)} l S`);
   }
-}
 
-function drawLogo(page: Page, x: number, y: number, size: number) {
-  page.fill("#FFFFFF");
-  page.roundRect(x, y, size, size, size * 0.22);
-  page.fill("#1D4ED8");
-  const inset = size * 0.08;
-  page.roundRect(x + inset, y + inset, size - inset * 2, size - inset * 2, size * 0.16);
-  const sx = (vx: number) => x + (vx / 32) * size;
-  const sy = (vy: number) => y + size - (vy / 32) * size;
-  page.stroke("#FFFFFF", Math.max(1.1, size * 0.045));
-  const seg = (ax: number, ay: number, bx: number, by: number) => {
-    page.line(sx(ax), sy(ay), sx(bx), sy(by));
-  };
-  seg(16, 6.5, 16, 25.5);
-  seg(16, 6.5, 19.2, 11.2);
-  seg(16, 6.5, 12.8, 11.2);
-  seg(8.5, 16, 23.5, 16);
-  seg(8.5, 16, 12.2, 13.2);
-  seg(8.5, 16, 12.2, 18.8);
-  seg(23.5, 16, 19.8, 13.2);
-  seg(23.5, 16, 19.8, 18.8);
-  page.fill("#FFFFFF");
-  const r = (2.2 / 32) * size;
-  page.roundRect(sx(16) - r, sy(16) - r, r * 2, r * 2, r);
+  image(name: string, x: number, y: number, w: number, h: number) {
+    this.ops.push(`q ${num(w)} 0 0 ${num(h)} ${num(x)} ${num(y)} cm /${name} Do Q`);
+  }
 }
 
 function groupPrograms(programs: EligibleProgram[]) {
@@ -225,7 +209,7 @@ export function buildEligibilityReceipt(input: {
   programs: EligibleProgram[];
   issuedAt?: Date;
 }) {
-  const orgName = displayText(input.orgName) || "Meridian";
+  const orgName = displayText(input.orgName) || "Abroad Aspirants";
   const legalName = displayText(input.legalName) || orgName;
   const studentName = displayText(input.studentName) || "Student";
   const issued = input.issuedAt ?? new Date();
@@ -258,8 +242,27 @@ export function buildEligibilityReceipt(input: {
     pages.push(page);
     page.fill("#0F2744");
     page.rect(0, PAGE_H - 46, PAGE_W, 46);
-    drawLogo(page, margin, PAGE_H - 38, 26);
-    page.text(margin + 34, PAGE_H - 28, "F2", 11, "#FFFFFF", orgName);
+    page.fill("#1D4ED8");
+    page.rect(0, PAGE_H - 48, PAGE_W, 2);
+
+    // Compact Abroad Aspirants logo card
+    const subCardW = 68;
+    const subCardH = 30;
+    const subLogoW = 60.8;
+    const subLogoH = 25;
+    const subX = margin;
+    const subY = PAGE_H - 39;
+    page.fill("#FFFFFF");
+    page.roundRect(subX, subY, subCardW, subCardH, 4);
+    page.image(
+      "ImLogo",
+      subX + (subCardW - subLogoW) / 2,
+      subY + (subCardH - subLogoH) / 2,
+      subLogoW,
+      subLogoH,
+    );
+
+    page.text(subX + subCardW + 12, PAGE_H - 28, "F2", 11, "#FFFFFF", orgName);
     const cont = "Eligibility receipt  ·  continued";
     page.text(PAGE_W - margin - textWidth(cont, 8), PAGE_H - 27, "F1", 8, "#DBEAFE", cont);
     cursor = 68;
@@ -273,15 +276,37 @@ export function buildEligibilityReceipt(input: {
   page.rect(0, PAGE_H - 132, PAGE_W, 132);
   page.fill("#1D4ED8");
   page.rect(0, PAGE_H - 136, PAGE_W, 4);
-  drawLogo(page, margin, PAGE_H - 108, 56);
-  page.text(margin + 72, PAGE_H - 62, "F2", 20, "#FFFFFF", orgName);
-  const legalLines = wrap(legalName, 9, contentW - 72);
+
+  // Official Abroad Aspirants logo badge
+  const logoCardW = 136;
+  const logoCardH = 56;
+  const logoW = 121.7;
+  const logoH = 50;
+  const logoX = margin;
+  const logoY = PAGE_H - 118;
+  page.fill("#FFFFFF");
+  page.roundRect(logoX, logoY, logoCardW, logoCardH, 6);
+  page.image(
+    "ImLogo",
+    logoX + (logoCardW - logoW) / 2,
+    logoY + (logoCardH - logoH) / 2,
+    logoW,
+    logoH,
+  );
+
+  const textX = logoX + logoCardW + 16;
+  page.text(textX, PAGE_H - 62, "F2", 18, "#FFFFFF", orgName);
+  const legalLines = wrap(legalName, 9, contentW - logoCardW - 16 - 120);
   legalLines.slice(0, 2).forEach((line, i) => {
-    page.text(margin + 72, PAGE_H - 82 - i * 12, "F1", 9, "#DBEAFE", line);
+    page.text(textX, PAGE_H - 80 - i * 12, "F1", 9, "#DBEAFE", line);
   });
+  page.text(textX, PAGE_H - 104, "F1", 8, "#93C5FD", "Official overseas education consultancy & admissions");
+
   const kicker = "ELIGIBILITY RECEIPT";
   page.text(PAGE_W - margin - textWidth(kicker, 9), PAGE_H - 54, "F2", 9, "#BFDBFE", kicker);
   page.text(PAGE_W - margin - textWidth("Official document", 8), PAGE_H - 68, "F1", 8, "#93C5FD", "Official document");
+  const docDate = `Issued ${issuedLabel}`;
+  page.text(PAGE_W - margin - textWidth(docDate, 8), PAGE_H - 82, "F1", 8, "#93C5FD", docDate);
 
   cursor = 164;
   page.text(margin, PAGE_H - cursor, "F2", 8, "#64748B", "STUDENT NAME");
@@ -343,41 +368,102 @@ export function buildEligibilityReceipt(input: {
 
   pages.forEach((current, index) => paintFooter(current, index, pages.length));
 
-  const objects: string[] = [];
-  const pageObjectIds: number[] = [];
-  objects.push("<< /Type /Catalog /Pages 2 0 R >>");
-  objects.push("<< /Type /Pages /Kids [] /Count 0 >>");
-  objects.push("<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>");
-  objects.push("<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold /Encoding /WinAnsiEncoding >>");
+  const logoBytes = getReceiptLogoBytes();
+  const encoder = new TextEncoder();
+  const chunks: Uint8Array[] = [];
+  const offsets: number[] = [0];
+  let currentOffset = 0;
 
-  pages.forEach((current) => {
-    const stream = `${current.ops.join("\n")}\n`;
-    const contentId = objects.length + 2;
-    const pageId = objects.length + 1;
-    pageObjectIds.push(pageId);
-    objects.push(
-      `<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${num(PAGE_W)} ${num(PAGE_H)}] /Contents ${contentId} 0 R /Resources << /Font << /F1 3 0 R /F2 4 0 R >> >> >>`,
+  const pushString = (str: string) => {
+    const bytes = encoder.encode(str);
+    chunks.push(bytes);
+    currentOffset += bytes.length;
+  };
+
+  const pushBytes = (bytes: Uint8Array) => {
+    chunks.push(bytes);
+    currentOffset += bytes.length;
+  };
+
+  pushString("%PDF-1.4\n");
+
+  const startObj = (id: number) => {
+    offsets[id] = currentOffset;
+    pushString(`${id} 0 obj\n`);
+  };
+
+  const endObj = () => {
+    pushString("endobj\n");
+  };
+
+  // 1: Catalog
+  startObj(1);
+  pushString("<< /Type /Catalog /Pages 2 0 R >>\n");
+  endObj();
+
+  // 2: Pages
+  const pageObjectIds = pages.map((_, i) => 6 + i * 2);
+  startObj(2);
+  pushString(
+    `<< /Type /Pages /Kids [${pageObjectIds.map((id) => `${id} 0 R`).join(" ")}] /Count ${pages.length} >>\n`,
+  );
+  endObj();
+
+  // 3: Font F1
+  startObj(3);
+  pushString("<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>\n");
+  endObj();
+
+  // 4: Font F2
+  startObj(4);
+  pushString("<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold /Encoding /WinAnsiEncoding >>\n");
+  endObj();
+
+  // 5: Image XObject /ImLogo
+  startObj(5);
+  pushString(
+    `<< /Type /XObject /Subtype /Image /Width ${RECEIPT_LOGO_WIDTH} /Height ${RECEIPT_LOGO_HEIGHT} /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length ${logoBytes.length} >>\nstream\n`,
+  );
+  pushBytes(logoBytes);
+  pushString("\nendstream\n");
+  endObj();
+
+  // Pages & Content streams
+  pages.forEach((p, index) => {
+    const pageId = 6 + index * 2;
+    const contentId = pageId + 1;
+    const stream = encoder.encode(`${p.ops.join("\n")}\n`);
+
+    // Page dict
+    startObj(pageId);
+    pushString(
+      `<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${num(PAGE_W)} ${num(PAGE_H)}] /Contents ${contentId} 0 R /Resources << /Font << /F1 3 0 R /F2 4 0 R >> /XObject << /ImLogo 5 0 R >> >> >>\n`,
     );
-    objects.push(`<< /Length ${byteLength(stream)} >>\nstream\n${stream}endstream`);
-  });
-  objects[1] = `<< /Type /Pages /Kids [${pageObjectIds.map((id) => `${id} 0 R`).join(" ")}] /Count ${pageObjectIds.length} >>`;
+    endObj();
 
-  let body = "%PDF-1.4\n";
-  const offsets = [0];
-  objects.forEach((object, index) => {
-    offsets.push(byteLength(body));
-    body += `${index + 1} 0 obj\n${object}\nendobj\n`;
+    // Content stream
+    startObj(contentId);
+    pushString(`<< /Length ${stream.length} >>\nstream\n`);
+    pushBytes(stream);
+    pushString("endstream\n");
+    endObj();
   });
-  const xrefAt = byteLength(body);
-  let xref = `xref\n0 ${objects.length + 1}\n0000000000 65535 f \n`;
+
+  // xref
+  const xrefAt = currentOffset;
+  let xref = `xref\n0 ${offsets.length}\n0000000000 65535 f \n`;
   for (let i = 1; i < offsets.length; i += 1) {
     xref += `${String(offsets[i]).padStart(10, "0")} 00000 n \n`;
   }
-  body += xref;
-  body += `trailer\n<< /Size ${objects.length + 1} /Root 1 0 R >>\nstartxref\n${xrefAt}\n%%EOF`;
-  return new TextEncoder().encode(body);
-}
+  pushString(xref);
+  pushString(`trailer\n<< /Size ${offsets.length} /Root 1 0 R >>\nstartxref\n${xrefAt}\n%%EOF`);
 
-function byteLength(value: string) {
-  return new TextEncoder().encode(value).length;
+  const totalLength = chunks.reduce((acc, c) => acc + c.length, 0);
+  const result = new Uint8Array(totalLength);
+  let pos = 0;
+  for (const c of chunks) {
+    result.set(c, pos);
+    pos += c.length;
+  }
+  return result;
 }

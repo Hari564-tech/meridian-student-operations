@@ -8,7 +8,7 @@ function key(): Promise<CryptoKey> {
   keyPromise ??= (async () => {
     const material = await crypto.subtle.importKey(
       "raw",
-      new TextEncoder().encode("meridian-student-ops-credential-key-v1"),
+      new TextEncoder().encode("abroad-aspirants-credential-key-v1"),
       "PBKDF2",
       false,
       ["deriveKey"],
@@ -16,7 +16,7 @@ function key(): Promise<CryptoKey> {
     return crypto.subtle.deriveKey(
       {
         name: "PBKDF2",
-        salt: new TextEncoder().encode("meridian-cred-salt-v1"),
+        salt: new TextEncoder().encode("abroad-aspirants-cred-salt-v1"),
         iterations: 120_000,
         hash: "SHA-256",
       },

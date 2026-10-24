@@ -21,11 +21,18 @@ import { useWorkspace } from "@/lib/workspace";
 import { useCanViewPayments } from "@/lib/access";
 import { APPLICATION_STATUSES, COUNTRIES, INTAKES, type Student } from "@/lib/types";
 import { relativeTime, toCsv, downloadText } from "@/lib/format";
-import { portalEffectiveStatus, portalUrl } from "@/lib/documents";
+import {
+  DOCUMENT_RECEIPT_STATUSES,
+  getStudentDocumentReceiptStatus,
+  portalEffectiveStatus,
+  portalUrl,
+} from "@/lib/documents";
+import { DocumentReceiptBadge } from "@/components/documents/document-receipt-badge";
 import { toast } from "sonner";
 
 export function StudentsPage() {
   const { students } = useScopedIds();
+  const allDocuments = useAppStore((s) => s.documents);
   const employees = useAppStore((s) => s.employees);
   const deleteStudent = useAppStore((s) => s.deleteStudent);
   const appendAudit = useAppStore((s) => s.appendAudit);
@@ -39,6 +46,7 @@ export function StudentsPage() {
   const [intake, setIntake] = useState("all");
   const [employee, setEmployee] = useState("all");
   const [status, setStatus] = useState("all");
+  const [docStatus, setDocStatus] = useState("all");
   const [pendingDelete, setPendingDelete] = useState<Student | null>(null);
 
   const filtered = useMemo(() => {
@@ -47,10 +55,15 @@ export function StudentsPage() {
       if (intake !== "all" && s.intake !== intake) return false;
       if (employee !== "all" && s.employeeId !== employee) return false;
       if (status !== "all" && s.status !== status) return false;
+      if (docStatus !== "all") {
+        const sDocs = allDocuments.filter((d) => d.studentId === s.id);
+        const receipt = getStudentDocumentReceiptStatus(s, sDocs);
+        if (receipt.status !== docStatus) return false;
+      }
       if (q && !`${s.name} ${s.id} ${s.email}`.toLowerCase().includes(q.toLowerCase())) return false;
       return true;
     });
-  }, [students, country, intake, employee, status, q]);
+  }, [students, country, intake, employee, status, docStatus, q, allDocuments]);
 
   const columns = useMemo<ColumnDef<Student>[]>(
     () => [
@@ -84,6 +97,40 @@ export function StudentsPage() {
         header: "Application status",
         cell: ({ row }) => <StatusBadge status={row.original.status} />,
       },
+      {
+        id: "documentStatus",
+        header: "Document Status",
+        enableSorting: true,
+        accessorFn: (row) => {
+          const docs = allDocuments.filter((d) => d.studentId === row.id);
+          return getStudentDocumentReceiptStatus(row, docs).status;
+        },
+        cell: ({ row }) => {
+          const student = row.original;
+          const docs = allDocuments.filter((d) => d.studentId === student.id);
+          const receipt = getStudentDocumentReceiptStatus(student, docs);
+          return (
+            <div
+              data-testid={`document-status-cell-${student.id}`}
+              className="group/doc-status flex flex-col items-start gap-1 cursor-pointer"
+              onClick={(e) => {
+                e.stopPropagation();
+                void navigate({ to: `${base}/students/${student.id}`, search: { tab: "documents" } });
+              }}
+              title="Click to view documents"
+            >
+              <DocumentReceiptBadge status={receipt.status} className="group-hover/doc-status:ring-2 transition-all" />
+              {receipt.totalRequired > 0 && receipt.status !== "No Requirements Configured" ? (
+                <span className="text-micro text-muted-foreground group-hover/doc-status:text-foreground">
+                  {receipt.receivedRequired} / {receipt.totalRequired} documents
+                </span>
+              ) : (
+                <span className="text-micro text-muted-foreground">0 required</span>
+              )}
+            </div>
+          );
+        },
+      },
       ...(showPayments
         ? [
             {
@@ -115,7 +162,7 @@ export function StudentsPage() {
               </DropdownMenuItem>
               <DropdownMenuItem
                 onClick={() => {
-                  sessionStorage.setItem(`meridian-upload-${row.original.id}`, "1");
+                  sessionStorage.setItem(`aa-upload-${row.original.id}`, "1");
                   void navigate({ to: `${base}/students/${row.original.id}` });
                 }}
               >
@@ -123,7 +170,7 @@ export function StudentsPage() {
               </DropdownMenuItem>
               <DropdownMenuItem
                 onClick={() => {
-                  sessionStorage.setItem(`meridian-portal-${row.original.id}`, "1");
+                  sessionStorage.setItem(`aa-portal-${row.original.id}`, "1");
                   void navigate({ to: `${base}/students/${row.original.id}` });
                 }}
               >
@@ -136,7 +183,7 @@ export function StudentsPage() {
                   );
                   if (!portal) {
                     toast.message("No active portal yet. Generate one from the student profile.");
-                    sessionStorage.setItem(`meridian-portal-${row.original.id}`, "1");
+                    sessionStorage.setItem(`aa-portal-${row.original.id}`, "1");
                     void navigate({ to: `${base}/students/${row.original.id}` });
                     return;
                   }
@@ -167,7 +214,7 @@ export function StudentsPage() {
         ),
       },
     ],
-    [empMap, base, navigate, role, portals, appendAudit, showPayments],
+    [empMap, base, navigate, role, portals, appendAudit, showPayments, allDocuments],
   );
 
   return (
@@ -183,15 +230,28 @@ export function StudentsPage() {
                 downloadText(
                   "students.csv",
                   toCsv(
-                    filtered.map((s) => ({
-                      id: s.id,
-                      name: s.name,
-                      country: s.country,
-                      intake: s.intake,
-                      status: s.status,
-                      ...(showPayments ? { payment: s.paymentStatus } : {}),
-                      employee: empMap[s.employeeId]?.name,
-                    })),
+                    filtered.map((s) => {
+                      const sDocs = allDocuments.filter((d) => d.studentId === s.id);
+                      const receipt = getStudentDocumentReceiptStatus(s, sDocs);
+                      return {
+                        id: s.id,
+                        name: s.name,
+                        country: s.country,
+                        intake: s.intake,
+                        status: s.status,
+                        documentStatus: receipt.status,
+                        documentCount: `${receipt.receivedRequired} / ${receipt.totalRequired}`,
+                        ...(s.country === "Germany"
+                          ? {
+                              blockedAccount: s.blockedAccount ?? "Not Applied",
+                              enrollmentStatus: s.enrollment ?? "Not Applied",
+                              studentDormStatus: s.studentDorm ?? "Not Applied",
+                            }
+                          : {}),
+                        ...(showPayments ? { payment: s.paymentStatus } : {}),
+                        employee: empMap[s.employeeId]?.name,
+                      };
+                    }),
                   ),
                 );
                 appendAudit({
@@ -231,6 +291,7 @@ export function StudentsPage() {
           setIntake("all");
           setEmployee("all");
           setStatus("all");
+          setDocStatus("all");
         }}
         pageSize={100}
         extraFilters={
@@ -265,38 +326,55 @@ export function StudentsPage() {
               allLabel="All statuses"
               options={APPLICATION_STATUSES}
             />
+            <FilterSelect
+              value={docStatus}
+              onChange={setDocStatus}
+              placeholder="Document Status"
+              allLabel="All Document Statuses"
+              options={DOCUMENT_RECEIPT_STATUSES}
+            />
           </>
         }
-        renderMobileCard={(s) => (
-          <div className="flex items-start justify-between gap-3">
-            <div className="flex gap-2">
-              <PersonAvatar name={s.name} hue={s.avatarHue} />
-              <div>
-                <p className="font-medium">{s.name}</p>
-                <p className="font-mono text-micro text-muted-foreground">{s.id}</p>
-                <p className="mt-1 text-xs text-muted-foreground">
-                  {s.country} · {s.intake}
-                </p>
+        renderMobileCard={(s) => {
+          const sDocs = allDocuments.filter((d) => d.studentId === s.id);
+          const receipt = getStudentDocumentReceiptStatus(s, sDocs);
+          return (
+            <div className="flex items-start justify-between gap-3">
+              <div className="flex gap-2">
+                <PersonAvatar name={s.name} hue={s.avatarHue} />
+                <div>
+                  <p className="font-medium">{s.name}</p>
+                  <p className="font-mono text-micro text-muted-foreground">{s.id}</p>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    {s.country} · {s.intake}
+                  </p>
+                  <div className="mt-2 flex items-center gap-1.5">
+                    <DocumentReceiptBadge status={receipt.status} />
+                    <span className="text-micro text-muted-foreground">
+                      {receipt.receivedRequired} / {receipt.totalRequired}
+                    </span>
+                  </div>
+                </div>
+              </div>
+              <div className="flex flex-col items-end gap-2">
+                <StatusBadge status={s.status} />
+                {role === "admin" && (
+                  <Button
+                    size="xs"
+                    variant="outline"
+                    className="text-destructive"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setPendingDelete(s);
+                    }}
+                  >
+                    <Trash2 className="size-3.5" /> Delete
+                  </Button>
+                )}
               </div>
             </div>
-            <div className="flex flex-col items-end gap-2">
-              <StatusBadge status={s.status} />
-              {role === "admin" && (
-                <Button
-                  size="xs"
-                  variant="outline"
-                  className="text-destructive"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setPendingDelete(s);
-                  }}
-                >
-                  <Trash2 className="size-3.5" /> Delete
-                </Button>
-              )}
-            </div>
-          </div>
-        )}
+          );
+        }}
       />
 
       <ConfirmDialog

@@ -15,18 +15,20 @@ import { PortalShareDrawer } from "@/components/documents/portal-share-drawer";
 import { useAppStore, nextStudentId } from "@/lib/store";
 import { BranchField } from "@/components/branch-field";
 import { useWorkspace } from "@/lib/workspace";
-import { rulesForCountry, categoryForType, formatBytes, validateUploadFile } from "@/lib/documents";
+import { rulesForCountry, categoryForType } from "@/lib/documents";
 import { openSecret, seal } from "@/lib/credential-crypto";
-import { readFileAsDataUrl, removeVaultFile, saveVaultFile } from "@/lib/file-vault";
 import { formatINR } from "@/lib/format";
 import { moneyFieldValue, moneyFromInput, settlePayment, type SettledPayment } from "@/lib/payment";
 import {
   APPLICATION_STATUSES,
   B2B_CONSULTANCIES,
+  BLOCKED_ACCOUNT_OPTIONS,
   COUNTRIES,
   ENGLISH_TESTS,
+  ENROLLMENT_STATUS_OPTIONS,
   GERMAN_LEVELS,
   INTAKES,
+  STUDENT_DORM_STATUS_OPTIONS,
   englishFromStudent,
   scoresForEnglish,
   toTenDigits,
@@ -40,7 +42,6 @@ import {
 } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
-import { FileText, Upload, X } from "lucide-react";
 
 const STEP_DEFS = [
   { key: "personal", label: "Personal" },
@@ -54,7 +55,7 @@ const STEP_DEFS = [
 ] as const;
 
 type StepKey = (typeof STEP_DEFS)[number]["key"];
-const DRAFT_KEY = "meridian-student-editor-draft-v3";
+const DRAFT_KEY = "abroad-aspirants-student-editor-draft-v1";
 
 type Draft = Omit<Student, "createdAt" | "updatedAt" | "avatarHue" | "paymentStatus">;
 
@@ -79,9 +80,9 @@ function emptyDraft(employeeId: string, intake: Intake): Draft {
     device: "",
     twoStep: false,
     uniAssistFiles: [],
-    blockedAccount: "",
-    enrollment: "",
-    studentDorm: "",
+    blockedAccount: "Not Applied",
+    enrollment: "Not Applied",
+    studentDorm: "Not Applied",
     totalFee: 100000,
     paidAmount: 0,
     discount: 0,
@@ -106,13 +107,15 @@ export function StudentFormPage({ studentId }: { studentId?: string }) {
     existing
       ? {
           ...existing,
+          blockedAccount: existing.blockedAccount || "Not Applied",
+          enrollment: existing.enrollment || "Not Applied",
+          studentDorm: existing.studentDorm || "Not Applied",
           phone1: toTenDigits(existing.phone1),
           phone2: toTenDigits(existing.phone2),
           ...englishFromStudent(existing),
         }
       : emptyDraft(defaultEmp, settings.defaultIntake),
   );
-  const [fileError, setFileError] = useState("");
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [saveState, setSaveState] = useState<"idle" | "saving" | "saved" | "unsaved">("idle");
   const [leaveOpen, setLeaveOpen] = useState(false);
@@ -263,41 +266,6 @@ export function StudentFormPage({ studentId }: { studentId?: string }) {
       body.uniAssistFiles = existing.uniAssistFiles;
     }
     return body;
-  }
-
-  async function addUniAssistFiles(list: FileList | null) {
-    if (!list?.length) return;
-    const next = [...(draft.uniAssistFiles ?? [])];
-    let message = "";
-    for (const file of Array.from(list)) {
-      const problem = validateUploadFile(file);
-      if (problem) {
-        message = `${file.name}: ${problem}`;
-        continue;
-      }
-      if (next.length >= 12) {
-        message = "You can attach up to 12 Uni-Assist Documents.";
-        break;
-      }
-      const id = `UAF-${crypto.randomUUID()}`;
-      await saveVaultFile(id, await readFileAsDataUrl(file));
-      next.push({ id, name: file.name, mime: file.type || "application/octet-stream", size: file.size });
-    }
-    setFileError(message);
-    patch({
-      uniAssistFiles: next,
-      uniAssistDocuments: next.length ? "Uploaded" : "Not Uploaded",
-    });
-  }
-
-  function removeUniAssistFile(file: UniAssistFile) {
-    const saved = existing?.uniAssistFiles?.some((item) => item.id === file.id);
-    if (!saved) void removeVaultFile(file.id);
-    const next = (draft.uniAssistFiles ?? []).filter((item) => item.id !== file.id);
-    patch({
-      uniAssistFiles: next,
-      uniAssistDocuments: next.length ? "Uploaded" : "Not Uploaded",
-    });
   }
 
   function next() {
@@ -666,8 +634,8 @@ export function StudentFormPage({ studentId }: { studentId?: string }) {
             <div>
               <h2 className="text-sm font-semibold">German-Specific Details</h2>
               <p className="mt-1 text-xs text-muted-foreground">
-                Germany-specific and optional. APS and Uni-Assist logins, documents, blocked account, enrollment, and
-                student dorm. Leave anything you do not have yet — a student can still be added.
+                Germany-specific and optional. APS and Uni-Assist logins, blocked account, enrollment status, and
+                student dorm status. Leave anything you do not have yet — a student can still be added.
               </p>
             </div>
             {draft.country !== "Germany" && (
@@ -706,66 +674,70 @@ export function StudentFormPage({ studentId }: { studentId?: string }) {
                   value={draft.uniAssistPassword ?? ""}
                   onChange={(v) => patch({ uniAssistPassword: v })}
                 />
-                <div className="grid gap-2 sm:col-span-2">
-                  <FormField label="Uni-Assist Documents" hint="PDF, Word, or image. Multiple files are fine.">
-                    <label className="flex cursor-pointer flex-col items-center justify-center gap-1 rounded-lg border border-dashed bg-secondary/30 px-4 py-5 text-center text-sm hover:bg-secondary/60">
-                      <Upload className="size-4 text-muted-foreground" />
-                      <span className="font-medium">Upload documents</span>
-                      <span className="text-micro text-muted-foreground">Optional</span>
-                      <input
-                        type="file"
-                        multiple
-                        className="sr-only"
-                        accept=".pdf,.jpg,.jpeg,.png,.webp,.doc,.docx,application/pdf,image/*"
-                        onChange={(e) => {
-                          void addUniAssistFiles(e.target.files);
-                          e.target.value = "";
-                        }}
-                      />
-                    </label>
-                  </FormField>
-                  {fileError && <p className="text-micro text-destructive">{fileError}</p>}
-                  {(draft.uniAssistFiles?.length ?? 0) > 0 && (
-                    <ul className="grid gap-2">
-                      {draft.uniAssistFiles!.map((file) => (
-                        <li key={file.id} className="flex items-center gap-2 rounded-lg border bg-card px-3 py-2">
-                          <FileText className="size-4 shrink-0 text-muted-foreground" />
-                          <span className="min-w-0 flex-1">
-                            <span className="block truncate text-sm font-medium">{file.name}</span>
-                            <span className="text-micro text-muted-foreground">{formatBytes(file.size)}</span>
-                          </span>
-                          <Button type="button" size="icon" variant="ghost" className="size-7" onClick={() => removeUniAssistFile(file)} aria-label={`Remove ${file.name}`}>
-                            <X className="size-3.5" />
-                          </Button>
-                        </li>
+                <FormField label="Blocked Account">
+                  <Select
+                    value={draft.blockedAccount || "Not Applied"}
+                    onValueChange={(v) => patch({ blockedAccount: v })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {BLOCKED_ACCOUNT_OPTIONS.map((opt) => (
+                        <SelectItem key={opt} value={opt}>
+                          {opt}
+                        </SelectItem>
                       ))}
-                    </ul>
-                  )}
-                </div>
-                <FormField label="Blocked Account" hint="Reference, bank, or status. Optional.">
-                  <Textarea
-                    className="min-h-20"
-                    value={draft.blockedAccount ?? ""}
-                    placeholder="Not recorded"
-                    onChange={(e) => patch({ blockedAccount: e.target.value })}
-                  />
+                      {draft.blockedAccount &&
+                        !(BLOCKED_ACCOUNT_OPTIONS as readonly string[]).includes(draft.blockedAccount) && (
+                          <SelectItem value={draft.blockedAccount}>{draft.blockedAccount}</SelectItem>
+                        )}
+                    </SelectContent>
+                  </Select>
                 </FormField>
-                <FormField label="Enrollment" hint="University, semester, or status. Optional.">
-                  <Textarea
-                    className="min-h-20"
-                    value={draft.enrollment ?? ""}
-                    placeholder="Not recorded"
-                    onChange={(e) => patch({ enrollment: e.target.value })}
-                  />
+                <FormField label="Enrollment Status">
+                  <Select
+                    value={draft.enrollment || "Not Applied"}
+                    onValueChange={(v) => patch({ enrollment: v })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {ENROLLMENT_STATUS_OPTIONS.map((opt) => (
+                        <SelectItem key={opt} value={opt}>
+                          {opt}
+                        </SelectItem>
+                      ))}
+                      {draft.enrollment &&
+                        !(ENROLLMENT_STATUS_OPTIONS as readonly string[]).includes(draft.enrollment) && (
+                          <SelectItem value={draft.enrollment}>{draft.enrollment}</SelectItem>
+                        )}
+                    </SelectContent>
+                  </Select>
                 </FormField>
-                <FormField label="Student Dorm" className="sm:col-span-2" hint="Accommodation details. Optional.">
-                  <Textarea
-                    className="min-h-20"
-                    value={draft.studentDorm ?? ""}
-                    placeholder="Not recorded"
-                    onChange={(e) => patch({ studentDorm: e.target.value })}
-                  />
+                <FormField label="Student Dorm Status">
+                  <Select
+                    value={draft.studentDorm || "Not Applied"}
+                    onValueChange={(v) => patch({ studentDorm: v })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {STUDENT_DORM_STATUS_OPTIONS.map((opt) => (
+                        <SelectItem key={opt} value={opt}>
+                          {opt}
+                        </SelectItem>
+                      ))}
+                      {draft.studentDorm &&
+                        !(STUDENT_DORM_STATUS_OPTIONS as readonly string[]).includes(draft.studentDorm) && (
+                          <SelectItem value={draft.studentDorm}>{draft.studentDorm}</SelectItem>
+                        )}
+                    </SelectContent>
+                  </Select>
                 </FormField>
+                <div className="hidden sm:block" />
               </div>
             )}
           </section>
@@ -986,22 +958,14 @@ function ReviewStep({
         hint="Germany-specific. Optional — blank fields do not block registration."
         wide
       >
-          <ReviewField label="APS Username" value={dash(draft.apsUsername)} />
-          <PasswordField label="APS Password" value={canEditSecrets ? (draft.apsPassword ?? "") : ""} />
-          <ReviewField label="Uni-Assist ID" value={dash(draft.uniAssistId)} />
-          <PasswordField label="Uni-Assist Password" value={canEditSecrets ? (draft.uniAssistPassword ?? "") : ""} />
-          <ReviewField
-            label="Uni-Assist Documents"
-            value={
-              draft.uniAssistFiles?.length
-                ? draft.uniAssistFiles.map((file) => file.name).join(", ")
-                : (draft.uniAssistDocuments ?? "None")
-            }
-          />
-          <ReviewField label="Blocked Account" value={dash(draft.blockedAccount)} />
-          <ReviewField label="Enrollment" value={dash(draft.enrollment)} />
-          <ReviewField label="Student Dorm" value={dash(draft.studentDorm)} />
-        </ReviewSection>
+        <ReviewField label="APS Username" value={dash(draft.apsUsername)} />
+        <PasswordField label="APS Password" value={canEditSecrets ? (draft.apsPassword ?? "") : ""} />
+        <ReviewField label="Uni-Assist ID" value={dash(draft.uniAssistId)} />
+        <PasswordField label="Uni-Assist Password" value={canEditSecrets ? (draft.uniAssistPassword ?? "") : ""} />
+        <ReviewField label="Blocked Account" value={dash(draft.blockedAccount)} />
+        <ReviewField label="Enrollment Status" value={dash(draft.enrollment)} />
+        <ReviewField label="Student Dorm Status" value={dash(draft.studentDorm)} />
+      </ReviewSection>
 
       <ReviewSection title="05 Payment">
         <ReviewField label="Total fee" value={formatINR(payment.totalFee)} />

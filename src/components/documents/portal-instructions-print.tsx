@@ -12,12 +12,12 @@ export function printPortalInstructions(
   const method = "Link only · no email required";
   const qr = qrSvgDataUri(url, 160);
   const html = `<!doctype html>
-<html><head><title>Meridian — Student document portal</title>
+<html><head><title>Abroad Aspirants — Student document portal</title>
 <style>
   @page { size: A4; margin: 18mm; }
   body { font-family: Inter, ui-sans-serif, system-ui, sans-serif; color: #111827; }
   .brand { display:flex; align-items:center; gap:12px; }
-  .mark { width:32px; height:32px; background:#2563eb; border-radius:8px; }
+  .mark { width:34px; height:34px; background:#090d16; border-radius:8px; display:flex; align-items:center; justify-content:center; overflow:hidden; }
   h1 { font-size: 22px; margin: 8px 0 4px; }
   h2 { font-size: 11px; letter-spacing: .16em; text-transform: uppercase; color:#6b7280; margin: 28px 0 10px; }
   .meta { display:grid; grid-template-columns: 1fr 1fr; gap: 12px 24px; font-size:14px; }
@@ -28,7 +28,7 @@ export function printPortalInstructions(
   code { font-size:12px; }
 </style></head>
 <body>
-  <div class="brand"><div class="mark"></div><div><strong>MERIDIAN</strong><div class="k">Student operations</div></div></div>
+  <div class="brand"><img src="/brand/logo.svg" alt="Abroad Aspirants" style="height:38px;width:auto;object-fit:contain;" /></div>
   <h1>Student document upload portal</h1>
   <p class="k">Controlled access · configured by your counselor</p>
   <div class="row">
@@ -53,7 +53,7 @@ export function printPortalInstructions(
     <li>Replace any document requested by your counselor.</li>
   </ol>
   <footer>
-    <span>Meridian Student Operations</span>
+    <span>Abroad Aspirants Student Operations</span>
     <span>Generated ${formatShortDate(new Date().toISOString())}</span>
   </footer>
 </body></html>`;

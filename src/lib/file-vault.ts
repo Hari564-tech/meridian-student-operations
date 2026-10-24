@@ -1,6 +1,6 @@
 import { openSecret, seal } from "@/lib/credential-crypto";
 
-const DB = "meridian-vault";
+const DB = "abroad-aspirants-vault";
 const STORE = "files";
 
 function database() {

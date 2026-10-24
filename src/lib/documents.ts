@@ -2,14 +2,17 @@ import type {
   Country,
   DocumentCategory,
   DocumentPriority,
+  DocumentReceiptStatus,
   DocumentStatus,
+  DocumentSubmissionStatus,
   Student,
   StudentDocument,
   StudentDocumentPortal,
-} from "@/lib/types";
-import { previewPathPrefix } from "@/lib/preview-path-prefix";
+} from "./types.ts";
+import { previewPathPrefix } from "./preview-path-prefix.ts";
 
-export { DOCUMENT_CATEGORIES } from "@/lib/types";
+export { DOCUMENT_CATEGORIES, DOCUMENT_SUBMISSION_STATUSES, DOCUMENT_RECEIPT_STATUSES } from "./types.ts";
+export type { DocumentSubmissionStatus, DocumentReceiptStatus } from "./types.ts";
 
 export const DOCUMENT_TYPE_CATALOG: Array<{
   type: string;
@@ -165,6 +168,149 @@ export function documentStats(docs: StudentDocument[]) {
   };
 }
 
+export interface DocumentSubmissionSummary {
+  status: DocumentSubmissionStatus;
+  totalRequired: number;
+  receivedRequired: number;
+  verifiedRequired: number;
+  underReviewRequired: number;
+  actionRequiredCount: number;
+  remainingRequired: number;
+  percentage: number;
+}
+
+export function calculateDocumentSubmissionStatus(
+  docs: StudentDocument[],
+): DocumentSubmissionSummary {
+  // Only evaluate documents marked as required (optional documents must not prevent required-document completion)
+  const required = docs.filter((d) => d.required);
+
+  if (required.length === 0) {
+    return {
+      status: "No Requirements Configured",
+      totalRequired: 0,
+      receivedRequired: 0,
+      verifiedRequired: 0,
+      underReviewRequired: 0,
+      actionRequiredCount: 0,
+      remainingRequired: 0,
+      percentage: 0,
+    };
+  }
+
+  const totalRequired = required.length;
+  const receivedRequired = required.filter((d) => isSubmitted(d.status)).length;
+  const verifiedRequired = required.filter((d) => d.status === "verified").length;
+  const underReviewRequired = required.filter((d) => d.status === "under_review" || d.status === "uploaded").length;
+  const actionRequiredCount = required.filter(
+    (d) => d.status === "rejected" || d.status === "expired" || Boolean(d.replacementRequested),
+  ).length;
+  const remainingRequired = Math.max(0, totalRequired - receivedRequired);
+  const percentage = Math.round((receivedRequired / totalRequired) * 100);
+
+  let status: DocumentSubmissionStatus;
+
+  // Precedence rules:
+  // 1. If any required document has been rejected, expired, or needs replacement, prioritize Action Required.
+  if (actionRequiredCount > 0) {
+    status = "Action Required";
+  } else if (receivedRequired === 0) {
+    // 2. If no required documents have been received: Not Received.
+    status = "Not Received";
+  } else if (receivedRequired < totalRequired) {
+    // 3. If some required documents are received but others are missing: Partially Received.
+    status = "Partially Received";
+  } else {
+    // All required documents have been received:
+    // 4. If all required documents have been verified: All Verified.
+    if (verifiedRequired === totalRequired) {
+      status = "All Verified";
+    } else if (underReviewRequired > 0) {
+      // 5. If all required documents are uploaded but some are awaiting review: Pending Review.
+      status = "Pending Review";
+    } else {
+      // 6. If all required documents have been uploaded and are awaiting no further review: All Received.
+      status = "All Received";
+    }
+  }
+
+  return {
+    status,
+    totalRequired,
+    receivedRequired,
+    verifiedRequired,
+    underReviewRequired,
+    actionRequiredCount,
+    remainingRequired,
+    percentage,
+  };
+}
+
+export interface DocumentReceiptSummary {
+  status: DocumentReceiptStatus | "No Requirements Configured";
+  totalRequired: number;
+  receivedRequired: number;
+  remainingRequired: number;
+  percentage: number;
+  isExplicit: boolean;
+  isManualOverride: boolean;
+}
+
+export function getStudentDocumentReceiptStatus(
+  student: Student,
+  docs: StudentDocument[],
+): DocumentReceiptSummary {
+  const required = docs.filter((d) => d.required);
+  const totalRequired = required.length;
+  const receivedRequired = required.filter((d) => isSubmitted(d.status)).length;
+  const remainingRequired = Math.max(0, totalRequired - receivedRequired);
+  const percentage = totalRequired > 0 ? Math.round((receivedRequired / totalRequired) * 100) : 0;
+
+  if (student.documentReceiptStatus) {
+    return {
+      status: student.documentReceiptStatus,
+      totalRequired,
+      receivedRequired,
+      remainingRequired,
+      percentage,
+      isExplicit: true,
+      isManualOverride: true,
+    };
+  }
+
+  if (totalRequired === 0) {
+    return {
+      status: "No Requirements Configured",
+      totalRequired: 0,
+      receivedRequired: 0,
+      remainingRequired: 0,
+      percentage: 0,
+      isExplicit: false,
+      isManualOverride: false,
+    };
+  }
+
+  // Derive default status when not explicitly chosen yet:
+  let defaultStatus: DocumentReceiptStatus;
+  if (receivedRequired === 0) {
+    defaultStatus = "Not Received";
+  } else if (receivedRequired >= totalRequired) {
+    defaultStatus = "Completely Received";
+  } else {
+    defaultStatus = "Partially Received";
+  }
+
+  return {
+    status: defaultStatus,
+    totalRequired,
+    receivedRequired,
+    remainingRequired,
+    percentage,
+    isExplicit: false,
+    isManualOverride: false,
+  };
+}
+
 export function groupedByCategory(docs: StudentDocument[], includeEmpty = true) {
   const groups: { category: DocumentCategory; items: StudentDocument[] }[] = [];
   for (const category of [
@@ -196,7 +342,7 @@ export function portalPath(token: string) {
 
 export function portalUrl(token: string) {
   const path = portalPath(token);
-  if (typeof window === "undefined") return `https://meridian.example${path}`;
+  if (typeof window === "undefined") return `https://abroadaspirants.example${path}`;
   const prefix =
     previewPathPrefix(window.location.hostname, window.location.pathname) ??
     (/^\/hds-[a-z0-9]+-\d+-[a-z0-9]+(?=\/|$)/i.exec(window.location.pathname)?.[0] ?? "");

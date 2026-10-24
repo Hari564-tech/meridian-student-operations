@@ -90,7 +90,7 @@ export function StudentUploadPortal({ token }: { token: string }) {
       <header className="border-b bg-card">
         <div className="mx-auto flex max-w-lg items-center justify-between px-4 py-4">
           <div>
-            <p className="text-micro font-medium uppercase tracking-[0.16em] text-muted-foreground">Meridian</p>
+            <p className="text-micro font-medium uppercase tracking-[0.16em] text-muted-foreground">Abroad Aspirants</p>
             <p className="text-sm font-semibold">Student Document Portal</p>
           </div>
           <Logo compact />

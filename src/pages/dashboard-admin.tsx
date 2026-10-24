@@ -132,7 +132,7 @@ export function AdminDashboardPage() {
               variant="outline"
               onClick={() => {
                 downloadText(
-                  "meridian-overview.csv",
+                  "abroad-aspirants-overview.csv",
                   toCsv([
                     {
                       students: students.length,

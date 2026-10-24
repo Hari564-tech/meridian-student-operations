@@ -73,6 +73,25 @@ export function documentTone(status: DocumentStatus): string {
   }
 }
 
+export function documentSubmissionTone(status: string): string {
+  switch (status) {
+    case "All Verified":
+      return "success";
+    case "All Received":
+      return "primary";
+    case "Pending Review":
+      return "info";
+    case "Partially Received":
+      return "warning";
+    case "Action Required":
+      return "danger";
+    case "Not Received":
+    case "No Requirements Configured":
+    default:
+      return "muted";
+  }
+}
+
 export function priorityTone(priority: Priority): string {
   switch (priority) {
     case "High":

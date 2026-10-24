@@ -235,9 +235,30 @@ export const AUDIT_ACTIONS = [
   "PORTAL_REGENERATED",
   "STUDENT_UPLOADED_DOCUMENT",
   "STUDENT_REPLACED_DOCUMENT",
+  "STUDENT_DOCUMENTS_EXPORTED",
 ] as const;
 
 export type AuditAction = (typeof AUDIT_ACTIONS)[number];
+
+export const DOCUMENT_SUBMISSION_STATUSES = [
+  "Not Received",
+  "Partially Received",
+  "Pending Review",
+  "Action Required",
+  "All Received",
+  "All Verified",
+  "No Requirements Configured",
+] as const;
+
+export type DocumentSubmissionStatus = (typeof DOCUMENT_SUBMISSION_STATUSES)[number];
+
+export const DOCUMENT_RECEIPT_STATUSES = [
+  "Not Received",
+  "Partially Received",
+  "Completely Received",
+] as const;
+
+export type DocumentReceiptStatus = (typeof DOCUMENT_RECEIPT_STATUSES)[number];
 
 export interface User {
   id: string;
@@ -266,6 +287,45 @@ export interface UniAssistFile {
   mime: string;
   size: number;
 }
+
+export const BLOCKED_ACCOUNT_OPTIONS = [
+  "Yes",
+  "No",
+  "Not Applied",
+  "Applied",
+  "In Progress",
+  "Account Opened",
+  "Funds Deposited",
+  "Confirmation Received",
+  "Completed",
+  "On Hold",
+  "Not Required",
+] as const;
+export type BlockedAccountStatus = (typeof BLOCKED_ACCOUNT_OPTIONS)[number];
+
+export const ENROLLMENT_STATUS_OPTIONS = [
+  "Not Applied",
+  "Applied",
+  "Documents Pending",
+  "Awaiting Confirmation",
+  "Enrolled",
+  "Enrollment Certificate Received",
+  "On Hold",
+  "Not Required",
+] as const;
+export type EnrollmentStatus = (typeof ENROLLMENT_STATUS_OPTIONS)[number];
+
+export const STUDENT_DORM_STATUS_OPTIONS = [
+  "Not Applied",
+  "Applied",
+  "Searching",
+  "Waiting List",
+  "Accommodation Confirmed",
+  "Contract Signed",
+  "No Availability",
+  "Not Required",
+] as const;
+export type StudentDormStatus = (typeof STUDENT_DORM_STATUS_OPTIONS)[number];
 
 export interface Student {
   id: string;
@@ -303,10 +363,14 @@ export interface Student {
   /** Legacy status kept for older records. New uploads set this from the file list. */
   uniAssistDocuments?: "Uploaded" | "Not Uploaded";
   uniAssistFiles?: UniAssistFile[];
-  /** Free-text blocked-account details. Older rows may still say Applied or Not Applied. */
-  blockedAccount?: string;
-  enrollment?: string;
-  studentDorm?: string;
+  /** Blocked account status for Germany applications. */
+  blockedAccount?: BlockedAccountStatus | string;
+  /** Enrollment status for Germany applications. */
+  enrollment?: EnrollmentStatus | string;
+  /** Student dorm accommodation status for Germany applications. */
+  studentDorm?: StudentDormStatus | string;
+  /** Employee-managed overall document receipt status (Not Received | Partially Received | Completely Received). */
+  documentReceiptStatus?: DocumentReceiptStatus;
   totalFee: number;
   paidAmount: number;
   discount: number;

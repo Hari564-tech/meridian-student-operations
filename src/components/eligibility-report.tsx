@@ -159,7 +159,7 @@ export function EligibilityReportDialog({
 
 function reportFilename(student: Student, ext: string) {
   const slug = student.name.replaceAll(/\s+/g, "_");
-  return `Meridian_Shortlist_${slug}_${student.id}.${ext}`;
+  return `Abroad_Aspirants_Shortlist_${slug}_${student.id}.${ext}`;
 }
 
 function reportId(student: Student) {
@@ -307,11 +307,7 @@ function buildReportHtml({
   <div class="page">
     <header class="top">
       <div class="brand">
-        <div class="mark">M</div>
-        <div>
-          <strong>${escapeHtml(settings.name || "Meridian")}</strong>
-          <span>Student operations</span>
-        </div>
+        <img src="/brand/logo.svg" alt="Abroad Aspirants" style="height:38px;width:auto;object-fit:contain;" />
       </div>
       <div class="docid">
         <div>${escapeHtml(reportId(student))}</div>
@@ -369,6 +365,6 @@ function buildWhatsAppSummary({
     );
     if (match.gaps[0]) lines.push(`   Next: ${match.gaps[0]}`);
   });
-  if (counselor) lines.push("", `Prepared by ${counselor.name}, Meridian`);
+  if (counselor) lines.push("", `Prepared by ${counselor.name}, Abroad Aspirants`);
   return lines.join("\n");
 }

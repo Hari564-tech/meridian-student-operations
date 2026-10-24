@@ -224,7 +224,7 @@ export function createSeed(now = Date.now()) {
     ...staff.map((name, i): User => ({
       id: `EMP-${String(i + 2).padStart(3, "0")}`,
       name,
-      email: i === 0 ? "employee@demo.com" : `${name.toLowerCase().replace(/[^a-z0-9]+/g, ".").replace(/^\.|\.$/g, "")}@meridian.edu`,
+      email: i === 0 ? "employee@demo.com" : `${name.toLowerCase().replace(/[^a-z0-9]+/g, ".").replace(/^\.|\.$/g, "")}@abroadaspirants.com`,
       phone: `+91 98480 ${11002 + i}`,
       role: "employee",
       title: i === 0 ? "Senior Counselor" : "Counselor",
@@ -373,7 +373,7 @@ export function createSeed(now = Date.now()) {
       gre: country === "USA" && r() > 0.4 ? Math.round(300 + r() * 28) : undefined,
       germanLanguage: germany ? pick(r, ["A1", "A2", "B1", "B2"]) : "None",
       gmailId: `${slug}@gmail.com`,
-      gmailPassword: `Meridian!${pad(i + 11, 2)}`,
+      gmailPassword: `AbroadAspirants!${pad(i + 11, 2)}`,
       recoveryNumber: phone(r),
       device: pick(r, DEVICES),
       twoStep: r() > 0.35,
@@ -382,9 +382,9 @@ export function createSeed(now = Date.now()) {
       uniAssistId: germany ? `UA${800000 + i}` : undefined,
       uniAssistPassword: germany ? `Ua@${pad(i + 31, 2)}` : undefined,
       uniAssistDocuments: germany ? (r() > 0.4 ? "Uploaded" : "Not Uploaded") : undefined,
-      blockedAccount: germany ? (r() > 0.55 ? "Applied" : "Not Applied") : undefined,
-      enrollment: germany ? (status === "Got Visa" || r() > 0.75 ? "Applied" : "Not Applied") : undefined,
-      studentDorm: germany ? (r() > 0.7 ? "Applied" : "Not Applied") : undefined,
+      blockedAccount: germany ? (r() > 0.55 ? "Yes" : "Not Applied") : undefined,
+      enrollment: germany ? (status === "Got Visa" || r() > 0.75 ? "Enrolled" : (r() > 0.5 ? "Applied" : "Not Applied")) : undefined,
+      studentDorm: germany ? (r() > 0.7 ? "Accommodation Confirmed" : (r() > 0.4 ? "Applied" : "Not Applied")) : undefined,
       totalFee,
       paidAmount,
       discount,
@@ -841,8 +841,8 @@ export function createSeed(now = Date.now()) {
   ];
 
   const settings: OrgSettings = {
-    name: "Meridian",
-    legalName: "Meridian Education Pvt. Ltd.",
+    name: "Abroad Aspirants",
+    legalName: "Abroad Aspirants Pvt. Ltd.",
     timezone: "Asia/Kolkata",
     currency: "INR",
     twoFactor: false,

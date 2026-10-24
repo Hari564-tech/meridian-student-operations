@@ -6,7 +6,7 @@ import { Toaster } from "sonner";
 import { AppErrorComponent } from "@/lib/error-component";
 import appCss from "../styles.css?url";
 
-const APP_NAME = "Meridian";
+const APP_NAME = "Abroad Aspirants";
 
 export const Route = createRootRoute({
   head: () => ({
@@ -17,7 +17,7 @@ export const Route = createRootRoute({
       { name: "theme-color", content: "#2563EB" },
       {
         name: "description",
-        content: "Meridian — student operations, applications, and payments in one workspace.",
+        content: "Abroad Aspirants — student operations, applications, and payments in one workspace.",
       },
     ],
     links: [
@@ -63,7 +63,7 @@ function NotFound() {
     <main className="flex min-h-dvh flex-col items-center justify-center gap-2 px-6 text-center">
       <p className="text-sm font-medium text-muted-foreground">404</p>
       <h1 className="text-xl font-semibold">Page not found</h1>
-      <p className="text-sm text-muted-foreground">This route doesn't exist in Meridian.</p>
+      <p className="text-sm text-muted-foreground">This route doesn't exist in Abroad Aspirants.</p>
       <a href="/" className="mt-3 text-sm font-medium text-primary">
         Back to workspace
       </a>

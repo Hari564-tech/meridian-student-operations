@@ -58,7 +58,9 @@ function LoginPage() {
     <div className="grid min-h-dvh lg:grid-cols-2">
       <aside className="relative hidden overflow-hidden bg-foreground text-background lg:flex lg:flex-col">
         <div className="relative z-10 flex flex-1 flex-col p-10">
-          <Logo className="[&_.text-foreground]:text-background [&_.text-muted-foreground]:text-background/60" />
+          <div className="w-fit rounded-lg bg-white/95 px-3 py-1.5 shadow-xs">
+            <Logo />
+          </div>
           <div className="mt-16 max-w-md">
             <p className="text-xs font-medium uppercase tracking-[0.18em] text-background/55">Student operations</p>
             <h1 className="mt-3 text-3xl font-semibold tracking-tight">
@@ -100,7 +102,7 @@ function LoginPage() {
                 autoComplete="username"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                placeholder="you@meridian.edu"
+                placeholder="you@abroadaspirants.com"
               />
             </div>
             <div className="grid gap-1.5">

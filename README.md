@@ -1,6 +1,6 @@
-# Meridian — Student Operations Platform
+# Abroad Aspirants — Student Operations Platform
 
-Meridian is a student operations and abroad education consultancy CRM platform designed to streamline student applications, university shortlisting, document verification, payments, and lead workflows.
+Abroad Aspirants is a student operations and abroad education consultancy CRM platform designed to streamline student applications, university shortlisting, document verification, payments, and lead workflows.
 
 ---
 
@@ -40,10 +40,10 @@ Meridian is a student operations and abroad education consultancy CRM platform d
 
 ```bash
 # Clone the repository
-git clone https://github.com/Hari564-tech/meridian-student-operations.git
+git clone https://github.com/Hari564-tech/abroad-aspirants-student-operations.git
 
 # Navigate into the project directory
-cd meridian-student-operations
+cd abroad-aspirants-student-operations
 
 # Install dependencies
 npm install

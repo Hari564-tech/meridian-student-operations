@@ -48,16 +48,22 @@ import { useWorkspace } from "@/lib/workspace";
 import { useCanViewPayments } from "@/lib/access";
 import {
   APPLICATION_STATUSES,
+  APS_APPLIED_BY_OPTIONS,
   BLOCKED_ACCOUNT_OPTIONS,
   ENROLLMENT_STATUS_OPTIONS,
   STUDENT_DORM_STATUS_OPTIONS,
+  UNIVERSITY_TYPES,
   englishFromStudent,
   getStudentRecoveryGmails,
   getStudentRecoveryNumbers,
   type ApplicationStatus,
+  type ApsAppliedBy,
   type Student,
+  type UniversityType,
 } from "@/lib/types";
 import { formatINR, formatShortDate, relativeTime } from "@/lib/format";
+import { getStudentPaymentDetails } from "@/lib/payment";
+import { UpdatePaymentDialog } from "@/components/payments/update-payment-dialog";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 
@@ -67,6 +73,7 @@ export function StudentDetailPage({ studentId }: { studentId: string }) {
   const applications = useAppStore((s) => s.applications).filter((a) => a.studentId === studentId);
   const documents = useAppStore((s) => s.documents).filter((d) => d.studentId === studentId);
   const payments = useAppStore((s) => s.payments).filter((p) => p.studentId === studentId);
+  const allPaymentTransactions = useAppStore((s) => s.paymentTransactions);
   const audit = useAppStore((s) => s.auditEvents).filter((e) => e.recordId === studentId);
   const changeStatus = useAppStore((s) => s.changeStudentStatus);
   const updateStudent = useAppStore((s) => s.updateStudent);
@@ -82,6 +89,7 @@ export function StudentDetailPage({ studentId }: { studentId: string }) {
   const canEditStatus = role === "admin" || role === "employee";
   const navigate = useNavigate();
   const [confirm, setConfirm] = useState(false);
+  const [paymentDialogOpen, setPaymentDialogOpen] = useState(false);
 
   const timeline = useMemo(() => {
     if (!student) return [];
@@ -198,14 +206,18 @@ export function StudentDetailPage({ studentId }: { studentId: string }) {
   const [quickStatusOpen, setQuickStatusOpen] = useState(false);
   const [savingField, setSavingField] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+  const paymentDetails = useMemo(
+    () => (student ? getStudentPaymentDetails(student, allPaymentTransactions, counselor?.name) : null),
+    [student, allPaymentTransactions, counselor],
+  );
 
   async function handleStatusUpdate(
-    field: "blockedAccount" | "enrollment" | "studentDorm",
+    field: "blockedAccount" | "enrollment" | "studentDorm" | "apsAppliedBy",
     label: string,
     newValue: string,
   ) {
     if (!student) return;
-    const previousValue = (student[field] as string) || "Not Applied";
+    const previousValue = (student[field] as string) || (field === "apsAppliedBy" ? "—" : "Not Applied");
     if (previousValue === newValue) return;
 
     setSavingField(field);
@@ -270,6 +282,16 @@ export function StudentDetailPage({ studentId }: { studentId: string }) {
                 ))}
               </SelectContent>
             </Select>
+            {showPayments && (
+              <Button
+                variant="outline"
+                onClick={() => setPaymentDialogOpen(true)}
+                className="gap-1.5 border-emerald-600/40 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-950/20 font-medium"
+                data-testid="header-update-payment-btn"
+              >
+                <CreditCard className="size-4 text-emerald-600" /> Update Payment
+              </Button>
+            )}
             {isGermany && (
               <Button
                 variant="outline"
@@ -292,6 +314,11 @@ export function StudentDetailPage({ studentId }: { studentId: string }) {
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
+                {showPayments && (
+                  <DropdownMenuItem onClick={() => setPaymentDialogOpen(true)}>
+                    <CreditCard className="size-4" /> Update Payment
+                  </DropdownMenuItem>
+                )}
                 {isGermany && (
                   <DropdownMenuItem onClick={() => setQuickStatusOpen(true)}>
                     <SlidersHorizontal className="size-4" /> Update Germany Status
@@ -452,7 +479,15 @@ export function StudentDetailPage({ studentId }: { studentId: string }) {
                   )}
                 </div>
               </CardHeader>
-              <CardContent className="grid gap-4 sm:grid-cols-3 pt-1">
+              <CardContent className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4 pt-1">
+                <StatusBadgeField label="APS Applied By"
+                  value={student.apsAppliedBy}
+                  options={APS_APPLIED_BY_OPTIONS}
+                  onValueChange={(v) => handleStatusUpdate("apsAppliedBy", "APS Applied By", v)}
+                  disabled={!canEditStatus}
+                  saving={savingField === "apsAppliedBy"}
+                  error={fieldErrors["apsAppliedBy"]}
+                />
                 <StatusBadgeField label="Blocked Account"
                   value={student.blockedAccount}
                   options={BLOCKED_ACCOUNT_OPTIONS}
@@ -544,6 +579,7 @@ export function StudentDetailPage({ studentId }: { studentId: string }) {
                 }
               />
               <Field label="Device" value={student.device || "—"} />
+              <Field label="University Type" value={student.universityType || "Public University"} />
               <Field label="Application status" value={student.status} />
               <Field label="Registered" value={formatShortDate(student.createdAt)} />
               <Field label="Last updated" value={relativeTime(student.updatedAt)} />
@@ -611,10 +647,19 @@ export function StudentDetailPage({ studentId }: { studentId: string }) {
           </Card>
           {showPayments && (
           <Card>
-            <CardHeader>
+            <CardHeader className="flex flex-row items-center justify-between pb-2">
               <CardTitle className="flex items-center gap-2">
                 <CreditCard className="size-4" /> Payment
               </CardTitle>
+              <Button
+                size="xs"
+                variant="outline"
+                onClick={() => setPaymentDialogOpen(true)}
+                className="gap-1 border-emerald-600/40 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-950/20"
+                data-testid="overview-update-payment-btn"
+              >
+                <CreditCard className="size-3.5" /> Update Payment
+              </Button>
             </CardHeader>
             <CardContent className="grid grid-cols-2 gap-3 text-sm">
               <Field label="Total fee" value={formatINR(student.totalFee)} />
@@ -669,7 +714,7 @@ export function StudentDetailPage({ studentId }: { studentId: string }) {
               <table className="w-full text-table">
                 <thead className="text-left text-muted-foreground">
                   <tr className="border-b">
-                    {["University", "Course", "Status", "Submitted", "Offer", "Deadline"].map((h) => (
+                    {["University", "Type", "Course", "Status", "Submitted", "Offer", "Deadline"].map((h) => (
                       <th key={h} className="px-5 py-2 font-medium">
                         {h}
                       </th>
@@ -680,6 +725,26 @@ export function StudentDetailPage({ studentId }: { studentId: string }) {
                   {applications.map((a) => (
                     <tr key={a.id} className="border-b last:border-0">
                       <td className="px-5 py-2.5">{uniMap[a.universityId]?.name ?? a.universityId}</td>
+                      <td className="px-5 py-2.5">
+                        <Select
+                          value={a.universityType || "Public University"}
+                          onValueChange={(v) => {
+                            upsertApplication({ ...a, universityType: v as UniversityType });
+                            toast.success("University type updated");
+                          }}
+                        >
+                          <SelectTrigger className="h-8 w-[150px]">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {UNIVERSITY_TYPES.map((t) => (
+                              <SelectItem key={t} value={t}>
+                                {t}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </td>
                       <td className="px-5 py-2.5">{a.course}</td>
                       <td className="px-5 py-2.5">
                         <Select
@@ -718,27 +783,125 @@ export function StudentDetailPage({ studentId }: { studentId: string }) {
         {showPayments && (
         <TabsContent value="payments">
           <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <CreditCard className="size-4" /> Payment summary
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid gap-3 sm:grid-cols-4">
-                <Field label="Total fee" value={formatINR(student.totalFee)} />
-                <Field label="Collected" value={formatINR(student.paidAmount)} />
-                <Field label="Discount" value={formatINR(student.discount)} />
-                <Field label="Remaining" value={formatINR(remaining)} />
+            <CardHeader className="flex flex-row items-center justify-between pb-3">
+              <div>
+                <CardTitle className="flex items-center gap-2">
+                  <CreditCard className="size-4 text-primary" /> Payment Summary & History
+                </CardTitle>
+                <CardDescription className="text-xs text-muted-foreground mt-0.5">
+                  Complete breakdown of fees, collected payments, and date-wise transaction history
+                </CardDescription>
               </div>
-              {payments.map((p) => (
-                <div key={p.id} className="flex items-center justify-between rounded-lg border px-3 py-2 text-sm">
-                  <span>{p.method ?? "Record"}</span>
-                  <span className="text-muted-foreground">
-                    {p.lastPayment ? relativeTime(p.lastPayment) : "No payment yet"}
-                  </span>
-                  <PaymentBadge status={p.status} />
+              <Button
+                size="sm"
+                onClick={() => setPaymentDialogOpen(true)}
+                className="gap-1.5 border-emerald-600/40 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-950/20 font-medium"
+                data-testid="payments-tab-update-payment-btn"
+                variant="outline"
+              >
+                <CreditCard className="size-4 text-emerald-600" /> Update Payment
+              </Button>
+            </CardHeader>
+            <CardContent className="space-y-5">
+              <div className="grid gap-3 sm:grid-cols-4">
+                <div className="rounded-lg border bg-secondary/30 p-3">
+                  <p className="text-xs text-muted-foreground">Total Fee</p>
+                  <p className="text-base font-semibold text-foreground">{formatINR(student.totalFee)}</p>
                 </div>
-              ))}
+                <div className="rounded-lg border bg-secondary/30 p-3">
+                  <p className="text-xs text-muted-foreground">Discount</p>
+                  <p className="text-base font-semibold text-emerald-600">{formatINR(student.discount)}</p>
+                </div>
+                <div className="rounded-lg border bg-secondary/30 p-3">
+                  <p className="text-xs text-muted-foreground">Collected</p>
+                  <p className="text-base font-semibold text-foreground">{formatINR(student.paidAmount)}</p>
+                </div>
+                <div className="rounded-lg border bg-secondary/30 p-3">
+                  <p className="text-xs text-muted-foreground">Remaining Due</p>
+                  <p className={`text-base font-semibold ${remaining > 0 ? "text-amber-600" : "text-emerald-600"}`}>
+                    {formatINR(remaining)}
+                  </p>
+                </div>
+              </div>
+
+              <div className="pt-2">
+                <div className="flex items-center justify-between mb-3">
+                  <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                    Payment Transactions ({paymentDetails?.transactions.length ?? 0})
+                  </h4>
+                  <span className="text-[11px] text-muted-foreground">
+                    Sorted by payment date (latest first)
+                  </span>
+                </div>
+                {paymentDetails?.transactions && paymentDetails.transactions.length > 0 ? (
+                  <div className="rounded-lg border overflow-hidden">
+                    <table className="w-full text-xs text-left">
+                      <thead className="bg-secondary/40 border-b text-muted-foreground font-medium">
+                        <tr>
+                          <th className="py-2.5 px-3">Payment Date</th>
+                          <th className="py-2.5 px-3">Amount</th>
+                          <th className="py-2.5 px-3">Method</th>
+                          <th className="py-2.5 px-3">Reference / Transaction ID</th>
+                          <th className="py-2.5 px-3">Recorded By</th>
+                          <th className="py-2.5 px-3">Notes</th>
+                          <th className="py-2.5 px-3">Receipt</th>
+                          <th className="py-2.5 px-3 text-right">Status</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-border">
+                        {paymentDetails.transactions.map((tx) => (
+                          <tr key={tx.id} className="hover:bg-secondary/20 transition-colors" data-testid={`payment-row-${tx.id}`}>
+                            <td className="py-2.5 px-3 font-medium text-foreground whitespace-nowrap">
+                              {formatShortDate(tx.paymentDate)}
+                            </td>
+                            <td className="py-2.5 px-3 font-bold text-emerald-600 whitespace-nowrap">
+                              {formatINR(tx.amount)}
+                            </td>
+                            <td className="py-2.5 px-3 whitespace-nowrap">
+                              <Badge variant="outline" className="text-[10px]">
+                                {tx.customMethod || tx.method}
+                              </Badge>
+                            </td>
+                            <td className="py-2.5 px-3 font-mono text-[11px] text-muted-foreground">
+                              {tx.reference || "—"}
+                            </td>
+                            <td className="py-2.5 px-3 text-muted-foreground">
+                              {tx.recordedBy}
+                            </td>
+                            <td className="py-2.5 px-3 text-muted-foreground truncate max-w-[150px]">
+                              {tx.notes || "—"}
+                            </td>
+                            <td className="py-2.5 px-3">
+                              {tx.receiptUrl ? (
+                                <a
+                                  href={tx.receiptUrl}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  download={tx.receiptFileName || "receipt.pdf"}
+                                  className="text-[11px] text-primary hover:underline font-medium"
+                                >
+                                  {tx.receiptFileName ? tx.receiptFileName.slice(0, 10) + "..." : "Receipt"}
+                                </a>
+                              ) : (
+                                <span className="text-muted-foreground/60">—</span>
+                              )}
+                            </td>
+                            <td className="py-2.5 px-3 text-right">
+                              <span className="inline-flex items-center rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-medium text-emerald-700">
+                                {tx.status}
+                              </span>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                ) : (
+                  <div className="rounded-lg border border-dashed p-6 text-center text-xs text-muted-foreground">
+                    No payment transactions recorded yet. Click "Update Payment" to record a payment.
+                  </div>
+                )}
+              </div>
             </CardContent>
           </Card>
         </TabsContent>
@@ -807,6 +970,14 @@ export function StudentDetailPage({ studentId }: { studentId: string }) {
           onUpdateStatus={handleStatusUpdate}
           savingField={savingField}
           fieldErrors={fieldErrors}
+        />
+      )}
+
+      {student && (
+        <UpdatePaymentDialog
+          student={student}
+          open={paymentDialogOpen}
+          onOpenChange={setPaymentDialogOpen}
         />
       )}
     </div>
@@ -949,7 +1120,7 @@ function QuickGermanyStatusDialog({
   student: Student;
   canEditStatus: boolean;
   onUpdateStatus: (
-    field: "blockedAccount" | "enrollment" | "studentDorm",
+    field: "blockedAccount" | "enrollment" | "studentDorm" | "apsAppliedBy",
     label: string,
     newValue: string,
   ) => void;
@@ -969,6 +1140,15 @@ function QuickGermanyStatusDialog({
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-4 py-2">
+          <StatusBadgeField
+            label="APS Applied By"
+            value={student.apsAppliedBy}
+            options={APS_APPLIED_BY_OPTIONS}
+            onValueChange={(v) => onUpdateStatus("apsAppliedBy", "APS Applied By", v)}
+            disabled={!canEditStatus}
+            saving={savingField === "apsAppliedBy"}
+            error={fieldErrors["apsAppliedBy"]}
+          />
           <StatusBadgeField
             label="Blocked Account"
             value={student.blockedAccount}

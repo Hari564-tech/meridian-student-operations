@@ -22,6 +22,7 @@ import { moneyFieldValue, moneyFromInput, settlePayment, type SettledPayment } f
 import { StudentLocationFields } from "@/components/location/student-location-fields";
 import {
   APPLICATION_STATUSES,
+  APS_APPLIED_BY_OPTIONS,
   B2B_CONSULTANCIES,
   BLOCKED_ACCOUNT_OPTIONS,
   COUNTRIES,
@@ -30,6 +31,7 @@ import {
   GERMAN_LEVELS,
   INTAKES,
   STUDENT_DORM_STATUS_OPTIONS,
+  UNIVERSITY_TYPES,
   englishFromStudent,
   getStudentRecoveryGmails,
   getStudentRecoveryNumbers,
@@ -37,12 +39,14 @@ import {
   scoresForEnglish,
   toTenDigits,
   type ApplicationStatus,
+  type ApsAppliedBy,
   type Country,
   type EnglishTest,
   type Intake,
   type LeadType,
   type Student,
   type UniAssistFile,
+  type UniversityType,
 } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
@@ -113,6 +117,8 @@ function emptyDraft(employeeId: string, intake: Intake): Draft {
     paidAmount: 0,
     discount: 0,
     leadType: "Direct",
+    universityType: "Public University",
+    apsAppliedBy: undefined,
     b2bOrg: undefined,
     otherB2bOrg: undefined,
     notes: "",
@@ -176,6 +182,8 @@ export function StudentFormPage({ studentId }: { studentId?: string }) {
         blockedAccount: existing.blockedAccount || "Not Applied",
         enrollment: existing.enrollment || "Not Applied",
         studentDorm: existing.studentDorm || "Not Applied",
+        apsAppliedBy: existing.apsAppliedBy,
+        universityType: existing.universityType || "Public University",
         phone1: toTenDigits(existing.phone1),
         phone2: toTenDigits(existing.phone2),
         otherEnglishTestName: existing.otherEnglishTestName ?? "",
@@ -1110,6 +1118,23 @@ export function StudentFormPage({ studentId }: { studentId?: string }) {
                   </SelectContent>
                 </Select>
               </FormField>
+              <FormField label="University Type">
+                <Select
+                  value={draft.universityType || "Public University"}
+                  onValueChange={(v) => patch({ universityType: v as UniversityType })}
+                >
+                  <SelectTrigger data-testid="university-type-select">
+                    <SelectValue placeholder="Select university type" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {UNIVERSITY_TYPES.map((t) => (
+                      <SelectItem key={t} value={t}>
+                        {t}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </FormField>
               {draft.leadType === "B2B" && (
                 <>
                   <FormField label="B2B consultancy" required error={errors.b2bOrg}>
@@ -1172,6 +1197,23 @@ export function StudentFormPage({ studentId }: { studentId?: string }) {
               </p>
             ) : (
               <div className="grid gap-4 sm:grid-cols-2">
+                <FormField label="APS Applied By">
+                  <Select
+                    value={draft.apsAppliedBy || ""}
+                    onValueChange={(v) => patch({ apsAppliedBy: v ? (v as ApsAppliedBy) : undefined })}
+                  >
+                    <SelectTrigger data-testid="aps-applied-by-select">
+                      <SelectValue placeholder="Select option" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {APS_APPLIED_BY_OPTIONS.map((opt) => (
+                        <SelectItem key={opt} value={opt}>
+                          {opt}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </FormField>
                 <FormField label="APS Username">
                   <Input
                     value={draft.apsUsername ?? ""}
@@ -1531,6 +1573,7 @@ function ReviewStep({
       <ReviewSection title="04 Application" onEdit={() => onNavigateStep(3)}>
         <ReviewField label="Application status" value={draft.status} />
         <ReviewField label="Lead type" value={draft.leadType} />
+        <ReviewField label="University Type" value={draft.universityType || "Public University"} />
         <ReviewField
           label="B2B consultancy"
           value={
@@ -1549,6 +1592,7 @@ function ReviewStep({
         wide
         onEdit={() => onNavigateStep(4)}
       >
+        <ReviewField label="APS Applied By" value={dash(draft.apsAppliedBy)} />
         <ReviewField label="APS Username" value={dash(draft.apsUsername)} />
         <PasswordField label="APS Password" value={canEditSecrets ? (draft.apsPassword ?? "") : ""} />
         <ReviewField label="Uni-Assist ID" value={dash(draft.uniAssistId)} />

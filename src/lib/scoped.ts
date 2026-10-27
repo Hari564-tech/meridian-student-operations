@@ -29,6 +29,7 @@ export function useScopedIds() {
   const students = useAppStore((s) => s.students);
   const applications = useAppStore((s) => s.applications);
   const payments = useAppStore((s) => s.payments);
+  const paymentTransactions = useAppStore((s) => s.paymentTransactions);
   const leads = useAppStore((s) => s.leads);
   const documents = useAppStore((s) => s.documents);
   const workItems = useAppStore((s) => s.workItems);
@@ -37,7 +38,17 @@ export function useScopedIds() {
 
   return useMemo(() => {
     if (role !== "employee" || !user) {
-      return { students, applications, payments, leads, documents, workItems, auditEvents, notifications };
+      return {
+        students,
+        applications,
+        payments,
+        paymentTransactions: paymentTransactions ?? [],
+        leads,
+        documents,
+        workItems,
+        auditEvents,
+        notifications,
+      };
     }
     const mine = students.filter((s) => s.employeeId === user.id);
     const ids = new Set(mine.map((s) => s.id));
@@ -45,6 +56,7 @@ export function useScopedIds() {
       students: mine,
       applications: applications.filter((a) => a.employeeId === user.id || ids.has(a.studentId)),
       payments: payments.filter((p) => ids.has(p.studentId)),
+      paymentTransactions: (paymentTransactions ?? []).filter((pt) => ids.has(pt.studentId)),
       leads: leads.filter((l) => l.employeeId === user.id),
       documents: documents.filter((d) => ids.has(d.studentId)),
       workItems: workItems.filter((w) => w.employeeId === user.id),
@@ -54,5 +66,5 @@ export function useScopedIds() {
         href: n.href.replace("/admin/", "/employee/"),
       })),
     };
-  }, [role, user, students, applications, payments, leads, documents, workItems, auditEvents, notifications]);
+  }, [role, user, students, applications, payments, paymentTransactions, leads, documents, workItems, auditEvents, notifications]);
 }

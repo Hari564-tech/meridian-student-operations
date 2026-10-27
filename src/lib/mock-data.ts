@@ -4,6 +4,7 @@ import {
   BRANCH_OPTIONS,
   COUNTRIES,
   INTAKES,
+  UNIVERSITY_TYPES,
   intakeIdPrefix,
   type Application,
   type ApplicationStatus,
@@ -19,6 +20,7 @@ import {
   type OrgSettings,
   type PaymentRecord,
   type PaymentStatus,
+  type PaymentTransaction,
   type Student,
   type StudentDocument,
   type StudentDocumentPortal,
@@ -457,6 +459,7 @@ export function createSeed(now = Date.now()) {
       twoStep: r() > 0.35,
       apsUsername: germany ? `aps.${slug.split(".")[0]}` : undefined,
       apsPassword: germany ? `Aps#${pad(i + 21, 2)}` : undefined,
+      apsAppliedBy: germany ? (r() > 0.5 ? "Student" : "By Employee") : undefined,
       uniAssistId: germany ? `UA${800000 + i}` : undefined,
       uniAssistPassword: germany ? `Ua@${pad(i + 31, 2)}` : undefined,
       uniAssistDocuments: germany ? (r() > 0.4 ? "Uploaded" : "Not Uploaded") : undefined,
@@ -467,6 +470,7 @@ export function createSeed(now = Date.now()) {
       paidAmount,
       discount,
       leadType: r() > 0.78 ? "B2B" : "Direct",
+      universityType: r() > 0.4 ? "Public University" : "Private University",
       b2bOrg: undefined,
       notes: "",
       avatarHue: hue(r),
@@ -494,6 +498,12 @@ export function createSeed(now = Date.now()) {
       branch: "CSE",
       employeeId: "EMP-002",
       status: "Applications Started",
+      apsAppliedBy: "By Employee",
+      universityType: "Public University",
+      totalFee: 75000,
+      discount: 0,
+      paidAmount: 35000,
+      paymentStatus: "Partially Paid",
     } satisfies Partial<Student>);
   }
 
@@ -527,6 +537,7 @@ export function createSeed(now = Date.now()) {
         deadline: u.deadline,
         employeeId: s.employeeId,
         createdAt: s.createdAt,
+        universityType: (s.id === "OCT26_001" && idx === 0) ? "Public University" : pick(r, UNIVERSITY_TYPES),
       });
     });
   });
@@ -542,6 +553,61 @@ export function createSeed(now = Date.now()) {
     lastPayment: s.paidAmount > 0 ? s.updatedAt : undefined,
     method: s.paidAmount > 0 ? pick(r, ["UPI", "NEFT", "Card", "Cash"]) : undefined,
   }));
+
+  const paymentTransactions: PaymentTransaction[] = [
+    {
+      id: "TXN-OCT26_001-01",
+      studentId: "OCT26_001",
+      amount: 20000,
+      paymentDate: "2026-10-01",
+      method: "Bank Transfer",
+      reference: "HDFC-IMPS-884192",
+      notes: "Registration token advance payment",
+      receiptUrl: "/receipts/receipt-oct26_001-01.pdf",
+      receiptFileName: "Rahul_Kumar_Advance_Receipt.pdf",
+      recordedBy: "Nagaraju",
+      recordedById: "EMP-002",
+      createdAt: "2026-10-01T10:30:00.000Z",
+      updatedAt: "2026-10-01T10:30:00.000Z",
+      status: "Completed",
+    },
+    {
+      id: "TXN-OCT26_001-02",
+      studentId: "OCT26_001",
+      amount: 15000,
+      paymentDate: "2026-10-05",
+      method: "UPI",
+      reference: "UPI/329847192837",
+      notes: "Part fee instalment 1",
+      receiptUrl: "/receipts/receipt-oct26_001-02.pdf",
+      receiptFileName: "Rahul_Kumar_Installment1.pdf",
+      recordedBy: "Nagaraju",
+      recordedById: "EMP-002",
+      createdAt: "2026-10-05T14:15:00.000Z",
+      updatedAt: "2026-10-05T14:15:00.000Z",
+      status: "Completed",
+    },
+  ];
+
+  students.forEach((s) => {
+    if (s.id !== "OCT26_001" && s.paidAmount > 0) {
+      const pDate = s.createdAt ? s.createdAt.slice(0, 10) : "2026-10-10";
+      paymentTransactions.push({
+        id: `TXN-INIT-${s.id}`,
+        studentId: s.id,
+        amount: s.paidAmount,
+        paymentDate: pDate,
+        method: pick(r, ["UPI", "Bank Transfer", "Card", "Cash"]),
+        reference: `REF-${s.id}`,
+        notes: "Initial enrollment payment",
+        recordedBy: employees.find((e) => e.id === s.employeeId)?.name ?? "Counselor",
+        recordedById: s.employeeId,
+        createdAt: s.createdAt,
+        updatedAt: s.createdAt,
+        status: "Completed",
+      });
+    }
+  });
 
   const leads: Lead[] = Array.from({ length: 32 }, (_, i) => {
     const name = `${pick(r, FIRST)} ${pick(r, LAST)}`;
@@ -945,6 +1011,7 @@ export function createSeed(now = Date.now()) {
     universities,
     applications,
     payments,
+    paymentTransactions,
     leads,
     documents,
     documentVersions,

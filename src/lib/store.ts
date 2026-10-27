@@ -25,6 +25,7 @@ import type {
   OrgSettings,
   PaymentRecord,
   PaymentStatus,
+  PaymentTransaction,
   PortalAccessLog,
   PortalAccessMethod,
   PortalPermissions,
@@ -34,6 +35,7 @@ import type {
   ThemeMode,
   University,
   UniversityShortlist,
+  UniversityType,
   User,
   WorkItem,
 } from "@/lib/types";
@@ -91,6 +93,7 @@ export interface AppStore {
   universities: University[];
   applications: Application[];
   payments: PaymentRecord[];
+  paymentTransactions: PaymentTransaction[];
   leads: Lead[];
   documents: StudentDocument[];
   documentVersions: DocumentVersion[];
@@ -123,6 +126,25 @@ export interface AppStore {
   changeStudentStatus: (id: string, status: ApplicationStatus) => void;
   assignEmployee: (studentId: string, employeeId: string) => void;
   updatePayment: (studentId: string, patch: Partial<PaymentRecord> & { paidAmount?: number }) => void;
+  recordStudentPayment: (input: {
+    studentId: string;
+    amount: number;
+    paymentDate: string;
+    method: string;
+    customMethod?: string;
+    reference?: string;
+    notes?: string;
+    receiptUrl?: string;
+    receiptFileName?: string;
+    recordedBy?: string;
+    recordedById?: string;
+  }) => {
+    ok: boolean;
+    transaction: PaymentTransaction;
+    remaining: number;
+    totalPaid: number;
+    status: PaymentStatus;
+  };
   upsertUniversity: (data: University) => void;
   archiveUniversity: (id: string) => void;
   duplicateUniversity: (id: string) => University | null;
@@ -138,6 +160,7 @@ export interface AppStore {
   upsertLead: (data: Lead) => void;
   deleteLead: (id: string) => void;
   upsertApplication: (data: Application) => void;
+  updateApplication: (id: string, patch: Partial<Application>) => void;
   updateEmployee: (id: string, patch: Partial<User>) => void;
   createEmployee: (input: {
     name: string;
@@ -321,6 +344,7 @@ export const useAppStore = create<AppStore>()(
       universities: seed.universities,
       applications: seed.applications,
       payments: seed.payments,
+      paymentTransactions: seed.paymentTransactions ?? [],
       leads: seed.leads,
       documents: seed.documents,
       documentVersions: seed.documentVersions,
@@ -520,6 +544,7 @@ export const useAppStore = create<AppStore>()(
           students: s.students.filter((st) => st.id !== id),
           applications: s.applications.filter((a) => a.studentId !== id),
           payments: s.payments.filter((p) => p.studentId !== id),
+          paymentTransactions: (s.paymentTransactions ?? []).filter((pt) => pt.studentId !== id),
           documents: s.documents.filter((d) => d.studentId !== id),
           documentVersions: s.documentVersions.filter((d) => d.studentId !== id),
           documentActivities: s.documentActivities.filter((d) => d.studentId !== id),
@@ -637,6 +662,123 @@ export const useAppStore = create<AppStore>()(
             ],
           };
         }),
+      recordStudentPayment: (input) => {
+        const state = get();
+        const student = state.students.find((st) => st.id === input.studentId);
+        if (!student) {
+          return {
+            ok: false,
+            transaction: {} as PaymentTransaction,
+            remaining: 0,
+            totalPaid: 0,
+            status: "Pending",
+          };
+        }
+
+        const nowIso = new Date().toISOString();
+        const currentTxns = (state.paymentTransactions || []).filter(
+          (t) => t.studentId === input.studentId && t.status !== "Voided",
+        );
+
+        const backfillTxns: PaymentTransaction[] = [];
+        if (currentTxns.length === 0 && student.paidAmount > 0) {
+          backfillTxns.push({
+            id: `TXN-INIT-${student.id}`,
+            studentId: student.id,
+            amount: student.paidAmount,
+            paymentDate: student.createdAt ? student.createdAt.slice(0, 10) : nowIso.slice(0, 10),
+            method: "Bank Transfer",
+            reference: `INIT-${student.id}`,
+            notes: "Initial registration payment",
+            recordedBy: student.employeeId
+              ? (state.employees.find((e) => e.id === student.employeeId)?.name ?? "Counselor")
+              : "Admissions Team",
+            recordedById: student.employeeId,
+            createdAt: student.createdAt || nowIso,
+            updatedAt: student.createdAt || nowIso,
+            status: "Completed",
+          });
+        }
+
+        const newTxn: PaymentTransaction = {
+          id: `TXN-${Date.now()}-${Math.floor(100 + Math.random() * 900)}`,
+          studentId: input.studentId,
+          amount: Math.max(0, Math.round(Number(input.amount) || 0)),
+          paymentDate: input.paymentDate || nowIso.slice(0, 10),
+          method: input.method,
+          customMethod: input.customMethod?.trim() || undefined,
+          reference: input.reference?.trim() || undefined,
+          notes: input.notes?.trim() || undefined,
+          receiptUrl: input.receiptUrl,
+          receiptFileName: input.receiptFileName,
+          recordedBy: input.recordedBy || state.currentUser?.name || "Counselor",
+          recordedById: input.recordedById || state.currentUser?.id,
+          createdAt: nowIso,
+          updatedAt: nowIso,
+          status: "Completed",
+        };
+
+        const allStudentTxns = [...currentTxns, ...backfillTxns, newTxn];
+        const newTotalPaid = allStudentTxns.reduce((sum, t) => sum + t.amount, 0);
+        const settled = settlePayment(student.totalFee, student.discount, newTotalPaid);
+
+        set((s) => ({
+          paymentTransactions: [newTxn, ...backfillTxns, ...s.paymentTransactions],
+          students: s.students.map((st) =>
+            st.id === input.studentId
+              ? {
+                  ...st,
+                  paidAmount: settled.paidAmount,
+                  paymentStatus: settled.status,
+                  updatedAt: nowIso,
+                }
+              : st,
+          ),
+          payments: s.payments.map((p) =>
+            p.studentId === input.studentId
+              ? {
+                  ...p,
+                  totalFee: settled.totalFee,
+                  discount: settled.discount,
+                  remaining: settled.remaining,
+                  status: settled.status,
+                  lastPayment: nowIso,
+                  initialPayment: p.initialPayment || settled.paidAmount,
+                  method: newTxn.method,
+                }
+              : p,
+          ),
+          auditEvents: [
+            makeAudit(s, {
+              action: "PAYMENT_UPDATE",
+              module: "Payments",
+              recordId: input.studentId,
+              before: student.paymentStatus,
+              after: settled.status,
+              details: `Recorded ₹${newTxn.amount.toLocaleString("en-IN")} payment via ${newTxn.customMethod || newTxn.method} (${newTxn.paymentDate}). Balance: ₹${settled.remaining.toLocaleString("en-IN")}`,
+              severity: "SUCCESS",
+            }),
+            ...s.auditEvents,
+          ],
+          notifications: [
+            notice(
+              "Payment recorded",
+              `₹${newTxn.amount.toLocaleString("en-IN")} received for ${student.name}. Remaining due: ₹${settled.remaining.toLocaleString("en-IN")}.`,
+              workspaceHref(s, input.studentId),
+              "payment",
+            ),
+            ...s.notifications,
+          ],
+        }));
+
+        return {
+          ok: true,
+          transaction: newTxn,
+          remaining: settled.remaining,
+          totalPaid: settled.paidAmount,
+          status: settled.status,
+        };
+      },
       upsertUniversity: (data) =>
         set((s) => {
           const exists = s.universities.some((u) => u.id === data.id);
@@ -868,6 +1010,20 @@ export const useAppStore = create<AppStore>()(
             ],
           };
         }),
+      updateApplication: (id, patch) =>
+        set((s) => ({
+          applications: s.applications.map((a) => (a.id === id ? { ...a, ...patch } : a)),
+          auditEvents: [
+            makeAudit(s, {
+              action: "UPDATE",
+              module: "Applications",
+              recordId: id,
+              details: `Updated application ${id}`,
+              severity: "INFO",
+            }),
+            ...s.auditEvents,
+          ],
+        })),
       updateEmployee: (id, patch) =>
         set((s) => {
           const isAdmin = s.currentUser?.role === "admin";
@@ -1636,6 +1792,7 @@ export const useAppStore = create<AppStore>()(
         universities: s.universities,
         applications: s.applications,
         payments: s.payments,
+        paymentTransactions: s.paymentTransactions,
         leads: s.leads,
         documents: s.documents,
         documentVersions: s.documentVersions,
@@ -1658,6 +1815,15 @@ export const useAppStore = create<AppStore>()(
           if (!state.b2bConsultancies || state.b2bConsultancies.length === 0) {
             state.b2bConsultancies = seed.b2bConsultancies;
           }
+          if (!state.paymentTransactions || state.paymentTransactions.length === 0) {
+            state.paymentTransactions = seed.paymentTransactions ?? [];
+          }
+          if (state.applications && state.applications.length > 0) {
+            state.applications = state.applications.map((app) => ({
+              ...app,
+              universityType: app.universityType ?? "Public University",
+            }));
+          }
           if (state.students && state.students.length > 0) {
             state.students = state.students.map((st) => {
               const recovery1 = st.recoveryNumber1 || st.recoveryNumber || st.phone1;
@@ -1671,6 +1837,8 @@ export const useAppStore = create<AppStore>()(
                 state: st.state ?? "Andhra Pradesh",
                 district: st.district ?? "Guntur",
                 villageCity: st.villageCity ?? "Repalle",
+                universityType: st.universityType ?? "Public University",
+                apsAppliedBy: st.apsAppliedBy ?? (st.country === "Germany" ? "Student" : undefined),
               };
             });
           }

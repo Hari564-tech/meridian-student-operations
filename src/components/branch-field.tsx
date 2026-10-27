@@ -39,6 +39,7 @@ export function BranchField({
             value={value}
             placeholder="Enter branch name"
             onChange={(e) => onChange(e.target.value)}
+            data-testid="student-branch-input"
           />
         </FormField>
       )}

@@ -1,4 +1,4 @@
-import type { PaymentStatus } from "@/lib/types";
+import type { PaymentStatus, PaymentTransaction, Student } from "./types.ts";
 
 /** Parse a rupee field. Strips currency marks and leading zeros so "044" is 44, not a string prefix. */
 export function moneyFromInput(raw: string): number {
@@ -37,4 +37,118 @@ export function settlePayment(totalFee: number, discount: number, paidAmount: nu
   if (paid > 0 && paid < payable) status = "Partially Paid";
   else if (payable === 0 ? fee > 0 || paid > 0 : paid >= payable) status = "Paid";
   return { totalFee: fee, discount: disc, paidAmount: paid, payable, remaining, status };
+}
+
+/**
+ * Live calculation for Update Payment panel:
+ * Total Payable = Total Fees - Discount
+ * Total Amount Previously Paid = Sum of all valid, non-voided payment transactions recorded before the current payment
+ * Current Due Before Payment = Total Payable - Total Amount Previously Paid
+ * Remaining Due After Payment = Current Due Before Payment - Current Payment Amount
+ */
+export function calculateRemainingAfterPayment(
+  totalFee: number,
+  discount: number,
+  previousPaid: number,
+  payingNow: number,
+) {
+  const fee = Math.max(0, Math.round(Number(totalFee) || 0));
+  const disc = Math.max(0, Math.round(Number(discount) || 0));
+  const totalPayable = Math.max(0, fee - disc);
+  const prevPaid = Math.max(0, Math.round(Number(previousPaid) || 0));
+  const currentDueBeforePayment = Math.max(0, totalPayable - prevPaid);
+  const now = Math.max(0, Math.round(Number(payingNow) || 0));
+  const remainingDueAfterPayment = Math.max(0, currentDueBeforePayment - now);
+  const isOverpayment = now > currentDueBeforePayment && currentDueBeforePayment > 0;
+  const isFullyPaid = currentDueBeforePayment <= 0;
+
+  return {
+    totalFee: fee,
+    discount: disc,
+    totalPayable,
+    previousPaid: prevPaid,
+    currentDueBeforePayment,
+    payingNow: now,
+    remainingDueAfterPayment,
+    isOverpayment,
+    isFullyPaid,
+  };
+}
+
+export interface StudentFinancialSummary {
+  student: Student;
+  totalFee: number;
+  discount: number;
+  totalPayable: number;
+  totalPaid: number;
+  currentDue: number;
+  remaining: number;
+  status: PaymentStatus;
+  transactions: PaymentTransaction[];
+}
+
+/**
+ * Returns consistent, unified date-wise payment transactions and balances for a student.
+ * If transactions have not been recorded yet but the student has a paidAmount > 0,
+ * synthesizes an initial registration transaction for historical continuity without double-counting.
+ */
+export function getStudentPaymentDetails(
+  student: Student,
+  allTransactions: PaymentTransaction[] = [],
+  counselorName?: string,
+): StudentFinancialSummary {
+  const rawTxns = (allTransactions || []).filter(
+    (t) => t.studentId === student.id && t.status !== "Voided",
+  );
+
+  let transactions = [...rawTxns];
+
+  // If no transactions exist in the store yet, but student already has an initial payment recorded,
+  // synthesize a transparent initial transaction so the payment history table is not empty.
+  if (transactions.length === 0 && student.paidAmount > 0) {
+    const regDate = student.createdAt ? student.createdAt.slice(0, 10) : new Date().toISOString().slice(0, 10);
+    transactions = [
+      {
+        id: `TXN-INIT-${student.id}`,
+        studentId: student.id,
+        amount: student.paidAmount,
+        paymentDate: regDate,
+        method: "Bank Transfer",
+        reference: `INIT-${student.id}`,
+        notes: "Initial registration payment",
+        recordedBy: counselorName ?? "Admissions Counselor",
+        createdAt: student.createdAt || new Date().toISOString(),
+        updatedAt: student.createdAt || new Date().toISOString(),
+        status: "Completed",
+      },
+    ];
+  }
+
+  // Always sort latest payment date first
+  transactions.sort((a, b) => {
+    const da = new Date(a.paymentDate).getTime();
+    const db = new Date(b.paymentDate).getTime();
+    if (da !== db) return db - da;
+    return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+  });
+
+  const txnsTotal = transactions.reduce((sum, t) => sum + t.amount, 0);
+  const totalPaid = Math.max(txnsTotal, student.paidAmount || 0);
+  const fee = Math.max(0, Math.round(Number(student.totalFee) || 0));
+  const discount = Math.max(0, Math.round(Number(student.discount) || 0));
+  const totalPayable = Math.max(0, fee - discount);
+  const currentDue = Math.max(0, totalPayable - totalPaid);
+  const settled = settlePayment(fee, discount, totalPaid);
+
+  return {
+    student,
+    totalFee: fee,
+    discount,
+    totalPayable,
+    totalPaid,
+    currentDue,
+    remaining: currentDue,
+    status: settled.status,
+    transactions,
+  };
 }

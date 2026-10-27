@@ -69,6 +69,33 @@ export const APPLICATION_STATUSES = [
 
 export type ApplicationStatus = (typeof APPLICATION_STATUSES)[number];
 
+export const APS_APPLIED_BY_OPTIONS = ["Student", "By Employee"] as const;
+export type ApsAppliedBy = (typeof APS_APPLIED_BY_OPTIONS)[number];
+
+export const UNIVERSITY_TYPES = ["Public University", "Private University"] as const;
+export type UniversityType = (typeof UNIVERSITY_TYPES)[number];
+
+export const PAYMENT_METHODS = ["Cash", "Bank Transfer", "UPI", "Card", "Other"] as const;
+export type PaymentMethod = (typeof PAYMENT_METHODS)[number];
+
+export interface PaymentTransaction {
+  id: string;
+  studentId: string;
+  amount: number;
+  paymentDate: string;
+  method: PaymentMethod | string;
+  customMethod?: string;
+  reference?: string;
+  notes?: string;
+  receiptUrl?: string;
+  receiptFileName?: string;
+  recordedBy: string;
+  recordedById?: string;
+  createdAt: string;
+  updatedAt: string;
+  status: "Completed" | "Pending" | "Voided";
+}
+
 export const INTAKES = [
   "Oct 2026",
   "Nov 2026",
@@ -572,6 +599,7 @@ export interface Student {
   twoStep: boolean;
   apsUsername?: string;
   apsPassword?: string;
+  apsAppliedBy?: ApsAppliedBy | string;
   uniAssistId?: string;
   uniAssistPassword?: string;
   /** Legacy status kept for older records. New uploads set this from the file list. */
@@ -589,6 +617,7 @@ export interface Student {
   paidAmount: number;
   discount: number;
   leadType: LeadType;
+  universityType?: UniversityType | string;
   b2bOrg?: string;
   otherB2bOrg?: string;
   notes: string;
@@ -647,6 +676,7 @@ export interface Application {
   deadline: string;
   employeeId: string;
   createdAt: string;
+  universityType?: UniversityType | string;
 }
 
 export interface PaymentRecord {

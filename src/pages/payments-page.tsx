@@ -14,17 +14,16 @@ import { useScopedIds, useStudentMap } from "@/lib/scoped";
 import { useWorkspace } from "@/lib/workspace";
 import { formatINR, formatLakhs, relativeTime } from "@/lib/format";
 import { settlePayment } from "@/lib/payment";
-import type { PaymentRecord } from "@/lib/types";
+import type { PaymentRecord, Student } from "@/lib/types";
+import { UpdatePaymentDialog } from "@/components/payments/update-payment-dialog";
 import { toast } from "sonner";
 
 export function PaymentsPage() {
   const { payments } = useScopedIds();
   const students = useStudentMap();
-  const updatePayment = useAppStore((s) => s.updatePayment);
   const { base } = useWorkspace();
   const navigate = useNavigate();
-  const [edit, setEdit] = useState<PaymentRecord | null>(null);
-  const [amount, setAmount] = useState("");
+  const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
 
   const figures = (p: PaymentRecord) => {
     const student = students[p.studentId];
@@ -87,8 +86,8 @@ export function PaymentsPage() {
             variant="outline"
             onClick={(e) => {
               e.stopPropagation();
-              setEdit(row.original);
-              setAmount(String(students[row.original.studentId]?.paidAmount ?? 0));
+              const st = students[row.original.studentId];
+              if (st) setSelectedStudent(st);
             }}
           >
             Update
@@ -126,30 +125,13 @@ export function PaymentsPage() {
         )}
       />
 
-      <Dialog open={!!edit} onOpenChange={(v) => !v && setEdit(null)}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Update payment</DialogTitle>
-          </DialogHeader>
-          {edit && (
-            <div className="grid gap-3">
-              <p className="text-sm text-muted-foreground">{students[edit.studentId]?.name}</p>
-              <FormField label="Amount paid (₹)">
-                <Input type="number" value={amount} onChange={(e) => setAmount(e.target.value)} />
-              </FormField>
-              <Button
-                onClick={() => {
-                  updatePayment(edit.studentId, { paidAmount: Number(amount) });
-                  toast.success("Payment information updated");
-                  setEdit(null);
-                }}
-              >
-                Save
-              </Button>
-            </div>
-          )}
-        </DialogContent>
-      </Dialog>
+      {selectedStudent && (
+        <UpdatePaymentDialog
+          student={selectedStudent}
+          open={!!selectedStudent}
+          onOpenChange={(v) => !v && setSelectedStudent(null)}
+        />
+      )}
     </div>
   );
 }

@@ -87,7 +87,23 @@ export const INTAKES = [
   "Dec 2027",
 ] as const;
 
-export type Intake = (typeof INTAKES)[number];
+export type Intake = string;
+
+export const INTAKE_TYPES = ["Monthly", "Seasonal", "Other"] as const;
+export type IntakeType = (typeof INTAKE_TYPES)[number];
+
+export const INTAKE_STATUSES = ["Active", "Inactive", "Archived"] as const;
+export type IntakeStatus = (typeof INTAKE_STATUSES)[number];
+
+export interface IntakeRecord {
+  id: string;
+  name: string;
+  type: IntakeType;
+  year: number;
+  status: IntakeStatus;
+  createdAt: string;
+  updatedAt: string;
+}
 
 /** Pull a 10-digit local number from raw input (keeps a leading 91 country code out). */
 export function toTenDigits(value: string) {
@@ -189,6 +205,22 @@ export const B2B_CONSULTANCIES = [
   "SMART SCHLORS",
   "Karthi Overseas",
 ] as const;
+
+export const B2B_CONSULTANCY_STATUSES = ["Active", "Inactive", "Archived"] as const;
+export type B2BConsultancyStatus = (typeof B2B_CONSULTANCY_STATUSES)[number];
+
+export interface B2BConsultancyRecord {
+  id: string;
+  name: string;
+  contactPerson?: string;
+  email?: string;
+  phone?: string;
+  status: B2BConsultancyStatus;
+  notes?: string;
+  isCustom?: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
 
 export const GERMAN_LEVELS = ["None", "A1", "A2", "B1", "B2", "C1"] as const;
 
@@ -335,6 +367,11 @@ export interface Student {
   phone2: string;
   country: Country;
   intake: Intake;
+  /** Student Location fields */
+  state?: string;
+  district?: string;
+  villageCity?: string;
+  isManualLocation?: boolean;
   branch: string;
   college: string;
   employeeId: string;
@@ -353,7 +390,12 @@ export interface Student {
   germanLanguage: string;
   gmailId: string;
   gmailPassword: string;
+  /** Legacy single recovery number */
   recoveryNumber: string;
+  /** Three independent recovery numbers */
+  recoveryNumber1?: string;
+  recoveryNumber2?: string;
+  recoveryNumber3?: string;
   device: string;
   twoStep: boolean;
   apsUsername?: string;
@@ -376,8 +418,17 @@ export interface Student {
   discount: number;
   leadType: LeadType;
   b2bOrg?: string;
+  otherB2bOrg?: string;
   notes: string;
   avatarHue: number;
+}
+
+export function getStudentRecoveryNumbers(student?: Partial<Student> | null) {
+  if (!student) return { recovery1: "", recovery2: "", recovery3: "" };
+  const recovery1 = student.recoveryNumber1 || student.recoveryNumber || "";
+  const recovery2 = student.recoveryNumber2 || "";
+  const recovery3 = student.recoveryNumber3 || "";
+  return { recovery1, recovery2, recovery3 };
 }
 
 export interface University {

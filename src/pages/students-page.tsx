@@ -47,6 +47,16 @@ export function StudentsPage() {
   const [employee, setEmployee] = useState("all");
   const [status, setStatus] = useState("all");
   const [docStatus, setDocStatus] = useState("all");
+  const storeIntakes = useAppStore((s) => s.intakes);
+  const intakeOptions = useMemo(() => {
+    return Array.from(
+      new Set([
+        ...storeIntakes.filter((i) => i.status === "Active").map((i) => i.name),
+        ...students.map((s) => s.intake),
+        ...INTAKES,
+      ]),
+    ).filter(Boolean);
+  }, [storeIntakes, students]);
   const [pendingDelete, setPendingDelete] = useState<Student | null>(null);
 
   const filtered = useMemo(() => {
@@ -237,7 +247,12 @@ export function StudentsPage() {
                         id: s.id,
                         name: s.name,
                         country: s.country,
+                        state: s.state ?? "",
+                        district: s.district ?? "",
+                        villageCity: s.villageCity ?? "",
                         intake: s.intake,
+                        leadType: s.leadType,
+                        b2bOrg: s.leadType === "B2B" ? (s.b2bOrg === "Other" ? (s.otherB2bOrg || "Other") : (s.b2bOrg || "")) : "",
                         status: s.status,
                         documentStatus: receipt.status,
                         documentCount: `${receipt.receivedRequired} / ${receipt.totalRequired}`,
@@ -308,7 +323,7 @@ export function StudentsPage() {
               onChange={setIntake}
               placeholder="Intakes"
               allLabel="All intakes"
-              options={INTAKES}
+              options={intakeOptions}
             />
             {role === "admin" && (
               <FilterSelect

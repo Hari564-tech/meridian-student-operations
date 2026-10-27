@@ -704,6 +704,12 @@ function UniversityEditor({
   onClose: () => void;
   onSave: (u: University) => void;
 }) {
+  const storeIntakes = useAppStore((s) => s.intakes);
+  const intakeList = useMemo(() => {
+    const active = storeIntakes.filter((i) => i.status === "Active").map((i) => i.name);
+    const set = new Set([...active, ...(value?.intake ? [value.intake] : []), ...INTAKES]);
+    return Array.from(set).filter(Boolean);
+  }, [storeIntakes, value?.intake]);
   const [draft, setDraft] = useState<University>(blankUni());
 
   useEffect(() => {
@@ -749,7 +755,7 @@ function UniversityEditor({
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                {INTAKES.map((i) => (
+                {intakeList.map((i) => (
                   <SelectItem key={i} value={i}>
                     {i}
                   </SelectItem>

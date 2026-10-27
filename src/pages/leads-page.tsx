@@ -31,6 +31,23 @@ export function LeadsPage() {
   const [country, setCountry] = useState("all");
   const [status, setStatus] = useState("all");
   const [intake, setIntake] = useState("all");
+  const storeIntakes = useAppStore((s) => s.intakes);
+  const storeConsultancies = useAppStore((s) => s.b2bConsultancies);
+  const intakeOptions = useMemo(() => {
+    return Array.from(
+      new Set([
+        ...storeIntakes.filter((i) => i.status === "Active").map((i) => i.name),
+        ...leads.map((l) => l.intake),
+        ...INTAKES,
+      ]),
+    ).filter(Boolean);
+  }, [storeIntakes, leads]);
+
+  const activeConsultancies = useMemo(() => {
+    const list = storeConsultancies.filter((c) => c.status === "Active").map((c) => c.name);
+    return list.length > 0 ? list : Array.from(B2B_CONSULTANCIES);
+  }, [storeConsultancies]);
+
   const [open, setOpen] = useState(false);
   const [draft, setDraft] = useState<Partial<Lead>>({});
 
@@ -156,7 +173,7 @@ export function LeadsPage() {
           onChange={setIntake}
           placeholder="Intakes"
           allLabel="All intakes"
-          options={INTAKES}
+          options={intakeOptions}
         />
       </div>
 
@@ -278,7 +295,7 @@ export function LeadsPage() {
                     <SelectValue placeholder="Select consultancy" />
                   </SelectTrigger>
                   <SelectContent>
-                    {B2B_CONSULTANCIES.map((name) => (
+                    {activeConsultancies.map((name) => (
                       <SelectItem key={name} value={name}>
                         {name}
                       </SelectItem>

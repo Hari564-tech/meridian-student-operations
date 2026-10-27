@@ -1,10 +1,13 @@
+import { useState, useEffect } from "react";
 import { PageHeader } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { IntakeManagement } from "@/components/settings/intake-management";
+import { B2BConsultancyManagement } from "@/components/settings/b2b-consultancy-management";
 import { useAppStore } from "@/lib/store";
 import { INTAKES, type Intake, type ThemeMode } from "@/lib/types";
 import { toast } from "sonner";
@@ -16,13 +19,64 @@ export function SettingsPage() {
   const setTheme = useAppStore((s) => s.setTheme);
   const resetDemo = useAppStore((s) => s.resetDemo);
   const employees = useAppStore((s) => s.employees);
+  const intakes = useAppStore((s) => s.intakes);
+
+  const [tab, setTab] = useState(() => {
+    if (typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search);
+      const requested = params.get("tab");
+      if (
+        requested &&
+        ["org", "intakes", "b2b", "users", "permissions", "notifications", "security", "appearance", "audit"].includes(
+          requested
+        )
+      ) {
+        return requested;
+      }
+    }
+    return "org";
+  });
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const handlePop = () => {
+        const params = new URLSearchParams(window.location.search);
+        const requested = params.get("tab");
+        if (
+          requested &&
+          ["org", "intakes", "b2b", "users", "permissions", "notifications", "security", "appearance", "audit"].includes(
+            requested
+          )
+        ) {
+          setTab(requested);
+        }
+      };
+      window.addEventListener("popstate", handlePop);
+      return () => window.removeEventListener("popstate", handlePop);
+    }
+  }, []);
+
+  const handleTabChange = (newTab: string) => {
+    setTab(newTab);
+    if (typeof window !== "undefined") {
+      const url = new URL(window.location.href);
+      url.searchParams.set("tab", newTab);
+      window.history.replaceState({}, "", url.toString());
+    }
+  };
+
+  const activeIntakeOptions = intakes.length > 0
+    ? intakes.filter((i) => i.status === "Active").map((i) => i.name)
+    : [...INTAKES];
 
   return (
     <div className="space-y-5">
-      <PageHeader title="Settings" description="Organization preferences. Controls are simulated." />
-      <Tabs defaultValue="org">
+      <PageHeader title="Settings" description="Organization preferences, intake master, and partner consultancies." />
+      <Tabs value={tab} onValueChange={handleTabChange}>
         <TabsList className="h-auto flex-wrap">
           <TabsTrigger value="org">Organization</TabsTrigger>
+          <TabsTrigger value="intakes" data-testid="tab-intakes">Intake Management</TabsTrigger>
+          <TabsTrigger value="b2b" data-testid="tab-b2b">B2B Consultancy</TabsTrigger>
           <TabsTrigger value="users">Users & roles</TabsTrigger>
           <TabsTrigger value="permissions">Permissions</TabsTrigger>
           <TabsTrigger value="notifications">Notifications</TabsTrigger>
@@ -48,7 +102,7 @@ export function SettingsPage() {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {INTAKES.map((i) => (
+                  {activeIntakeOptions.map((i) => (
                     <SelectItem key={i} value={i}>
                       {i}
                     </SelectItem>
@@ -63,6 +117,14 @@ export function SettingsPage() {
               Save
             </Button>
           </Card>
+        </TabsContent>
+
+        <TabsContent value="intakes">
+          <IntakeManagement />
+        </TabsContent>
+
+        <TabsContent value="b2b">
+          <B2BConsultancyManagement />
         </TabsContent>
 
         <TabsContent value="users">

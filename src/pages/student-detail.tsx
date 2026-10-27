@@ -52,6 +52,7 @@ import {
   ENROLLMENT_STATUS_OPTIONS,
   STUDENT_DORM_STATUS_OPTIONS,
   englishFromStudent,
+  getStudentRecoveryNumbers,
   type ApplicationStatus,
   type Student,
 } from "@/lib/types";
@@ -126,6 +127,7 @@ export function StudentDetailPage({ studentId }: { studentId: string }) {
   const pct = student.totalFee ? Math.round((student.paidAmount / (student.totalFee - student.discount || 1)) * 100) : 0;
   const counselor = empMap[student.employeeId];
   const offers = applications.filter((a) => a.offerReceived).length;
+  const recovery = useMemo(() => getStudentRecoveryNumbers(student), [student]);
   const initialTab =
     typeof window !== "undefined" &&
     (new URLSearchParams(window.location.search).get("tab") === "documents" ||
@@ -491,11 +493,25 @@ export function StudentDetailPage({ studentId }: { studentId: string }) {
               <Field label="Phone 2" value={student.phone2 || "—"} />
               <Field label="Email" value={student.email} />
               <Field label="Country" value={student.country} />
+              <Field label="State" value={student.state || "—"} />
+              <Field label="District" value={student.district || "—"} />
+              <Field label="Village / City" value={student.villageCity || "—"} />
               <Field label="Intake" value={student.intake} />
               <Field label="Branch" value={student.branch} />
               <Field label="College / University" value={student.college} />
               <Field label="Lead type" value={student.leadType} />
-              <Field label="B2B consultancy" value={student.b2bOrg || "—"} />
+              <Field
+                label="B2B consultancy"
+                value={
+                  student.leadType === "B2B"
+                    ? student.b2bOrg === "Other"
+                      ? student.otherB2bOrg
+                        ? `${student.otherB2bOrg} (Other)`
+                        : "Other"
+                      : student.b2bOrg || "—"
+                    : "—"
+                }
+              />
               <Field label="Device" value={student.device || "—"} />
               <Field label="Lead By" value={counselor?.name ?? "Unassigned"} />
               <Field label="Application status" value={student.status} />
@@ -532,12 +548,23 @@ export function StudentDetailPage({ studentId }: { studentId: string }) {
             </CardHeader>
             <CardContent className="grid gap-3">
               <p className="text-xs text-muted-foreground">
-                Passwords stay masked and are encrypted in saved records. Only an administrator or the assigned
+                Passwords and recovery numbers stay masked and are encrypted in saved records. Only an administrator or the assigned
                 counselor can reveal them.
               </p>
               <Field label="Gmail ID" value={student.gmailId} />
               <PasswordField label="Gmail password" value={canViewSecrets ? student.gmailPassword : ""} />
-              <Field label="Recovery number" value={student.recoveryNumber} />
+              <Field
+                label="Recovery Number 1 (Primary)"
+                value={canViewSecrets ? (recovery.recovery1 || "—") : (recovery.recovery1 ? "••••••••••" : "—")}
+              />
+              <Field
+                label="Recovery Number 2"
+                value={canViewSecrets ? (recovery.recovery2 || "—") : (recovery.recovery2 ? "••••••••••" : "—")}
+              />
+              <Field
+                label="Recovery Number 3"
+                value={canViewSecrets ? (recovery.recovery3 || "—") : (recovery.recovery3 ? "••••••••••" : "—")}
+              />
               <Field label="2-step verification" value={student.twoStep ? "Enabled" : "Off"} />
             </CardContent>
           </Card>

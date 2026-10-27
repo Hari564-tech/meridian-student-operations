@@ -12,6 +12,8 @@ import {
   type AuditSeverity,
   type Country,
   type Intake,
+  type IntakeRecord,
+  type B2BConsultancyRecord,
   type Lead,
   type LeadPipeline,
   type OrgSettings,
@@ -196,6 +198,52 @@ function paymentFromAmounts(total: number, paid: number, discount: number): Paym
   return "Partially Paid";
 }
 
+export const INITIAL_INTAKES: IntakeRecord[] = [
+  { id: "INT-001", name: "October 2026", type: "Monthly", year: 2026, status: "Active", createdAt: "2026-06-29T10:00:00.000Z", updatedAt: "2026-06-29T10:00:00.000Z" },
+  { id: "INT-002", name: "November 2026", type: "Monthly", year: 2026, status: "Active", createdAt: "2026-06-29T10:00:00.000Z", updatedAt: "2026-06-29T10:00:00.000Z" },
+  { id: "INT-003", name: "December 2026", type: "Monthly", year: 2026, status: "Active", createdAt: "2026-06-29T10:00:00.000Z", updatedAt: "2026-06-29T10:00:00.000Z" },
+  { id: "INT-004", name: "January 2027", type: "Monthly", year: 2027, status: "Active", createdAt: "2026-07-29T10:00:00.000Z", updatedAt: "2026-07-29T10:00:00.000Z" },
+  { id: "INT-005", name: "February 2027", type: "Monthly", year: 2027, status: "Active", createdAt: "2026-07-29T10:00:00.000Z", updatedAt: "2026-07-29T10:00:00.000Z" },
+  { id: "INT-006", name: "March 2027", type: "Monthly", year: 2027, status: "Active", createdAt: "2026-07-29T10:00:00.000Z", updatedAt: "2026-07-29T10:00:00.000Z" },
+  { id: "INT-007", name: "April 2027", type: "Monthly", year: 2027, status: "Active", createdAt: "2026-07-29T10:00:00.000Z", updatedAt: "2026-07-29T10:00:00.000Z" },
+  { id: "INT-008", name: "May 2027", type: "Monthly", year: 2027, status: "Active", createdAt: "2026-07-29T10:00:00.000Z", updatedAt: "2026-07-29T10:00:00.000Z" },
+  { id: "INT-009", name: "June 2027", type: "Monthly", year: 2027, status: "Active", createdAt: "2026-07-29T10:00:00.000Z", updatedAt: "2026-07-29T10:00:00.000Z" },
+  { id: "INT-010", name: "July 2027", type: "Monthly", year: 2027, status: "Active", createdAt: "2026-07-29T10:00:00.000Z", updatedAt: "2026-07-29T10:00:00.000Z" },
+  { id: "INT-011", name: "August 2027", type: "Monthly", year: 2027, status: "Active", createdAt: "2026-07-29T10:00:00.000Z", updatedAt: "2026-07-29T10:00:00.000Z" },
+  { id: "INT-012", name: "September 2027", type: "Monthly", year: 2027, status: "Active", createdAt: "2026-07-29T10:00:00.000Z", updatedAt: "2026-07-29T10:00:00.000Z" },
+  { id: "INT-013", name: "October 2027", type: "Monthly", year: 2027, status: "Active", createdAt: "2026-07-29T10:00:00.000Z", updatedAt: "2026-07-29T10:00:00.000Z" },
+  { id: "INT-014", name: "November 2027", type: "Monthly", year: 2027, status: "Active", createdAt: "2026-07-29T10:00:00.000Z", updatedAt: "2026-07-29T10:00:00.000Z" },
+  { id: "INT-015", name: "December 2027", type: "Monthly", year: 2027, status: "Active", createdAt: "2026-07-29T10:00:00.000Z", updatedAt: "2026-07-29T10:00:00.000Z" },
+  { id: "INT-016", name: "Summer 2027", type: "Seasonal", year: 2027, status: "Active", createdAt: "2026-08-28T10:00:00.000Z", updatedAt: "2026-08-28T10:00:00.000Z" },
+  { id: "INT-017", name: "Winter 2027", type: "Seasonal", year: 2027, status: "Active", createdAt: "2026-08-28T10:00:00.000Z", updatedAt: "2026-08-28T10:00:00.000Z" },
+  { id: "INT-018", name: "Spring 2027", type: "Seasonal", year: 2027, status: "Active", createdAt: "2026-08-28T10:00:00.000Z", updatedAt: "2026-08-28T10:00:00.000Z" },
+  { id: "INT-019", name: "Oct 2026", type: "Monthly", year: 2026, status: "Active", createdAt: "2026-06-29T10:00:00.000Z", updatedAt: "2026-06-29T10:00:00.000Z" },
+  { id: "INT-020", name: "Nov 2026", type: "Monthly", year: 2026, status: "Active", createdAt: "2026-06-29T10:00:00.000Z", updatedAt: "2026-06-29T10:00:00.000Z" },
+  { id: "INT-021", name: "Dec 2026", type: "Monthly", year: 2026, status: "Active", createdAt: "2026-06-29T10:00:00.000Z", updatedAt: "2026-06-29T10:00:00.000Z" },
+  { id: "INT-022", name: "Jan 2027", type: "Monthly", year: 2027, status: "Active", createdAt: "2026-07-29T10:00:00.000Z", updatedAt: "2026-07-29T10:00:00.000Z" },
+  { id: "INT-023", name: "Feb 2027", type: "Monthly", year: 2027, status: "Active", createdAt: "2026-07-29T10:00:00.000Z", updatedAt: "2026-07-29T10:00:00.000Z" },
+  { id: "INT-024", name: "Summer 2026", type: "Seasonal", year: 2026, status: "Archived", createdAt: "2025-12-31T10:00:00.000Z", updatedAt: "2026-07-19T10:00:00.000Z" },
+  { id: "INT-025", name: "Winter 2026", type: "Seasonal", year: 2026, status: "Inactive", createdAt: "2026-02-19T10:00:00.000Z", updatedAt: "2026-08-08T10:00:00.000Z" },
+];
+
+export const INITIAL_B2B_CONSULTANCIES: B2BConsultancyRecord[] = [
+  { id: "B2B-001", name: "ABC Overseas Consultancy", contactPerson: "Rajesh Varma", email: "rajesh@abcoverlink.com", phone: "9848022334", status: "Active", notes: "Key partner for South India student recruitment.", createdAt: "2026-04-30T10:00:00.000Z", updatedAt: "2026-09-27T10:00:00.000Z" },
+  { id: "B2B-002", name: "Global Education Consultants", contactPerson: "Sunita Menon", email: "sunita@globaledu.org", phone: "9876543210", status: "Active", notes: "High volume STEM candidate pipeline.", createdAt: "2026-05-30T10:00:00.000Z", updatedAt: "2026-10-07T10:00:00.000Z" },
+  { id: "B2B-003", name: "Future Path Overseas", contactPerson: "Vikram Sethi", email: "vikram@futurepath.in", phone: "9988776655", status: "Active", notes: "Focus on Germany and UK universities.", createdAt: "2026-06-29T10:00:00.000Z", updatedAt: "2026-10-12T10:00:00.000Z" },
+  { id: "B2B-004", name: "Dream Abroad", contactPerson: "Anil Kapoor", email: "anil@dreamabroad.co", phone: "9123456789", status: "Active", notes: "Established consultancy partner.", createdAt: "2026-04-10T10:00:00.000Z", updatedAt: "2026-10-17T10:00:00.000Z" },
+  { id: "B2B-005", name: "AHM", contactPerson: "Mohammed Arif", email: "arif@ahmoverseas.com", phone: "9849112233", status: "Active", notes: "Telangana & AP network.", createdAt: "2026-07-19T10:00:00.000Z", updatedAt: "2026-10-22T10:00:00.000Z" },
+  { id: "B2B-006", name: "IOE", contactPerson: "Kavita Rao", email: "kavita@ioe-edu.com", phone: "9440112244", status: "Active", notes: "Europe specialized.", createdAt: "2026-07-29T10:00:00.000Z", updatedAt: "2026-10-22T10:00:00.000Z" },
+  { id: "B2B-007", name: "IAS", contactPerson: "Suresh Babu", email: "suresh@iasglobal.in", phone: "9701234567", status: "Active", notes: "Standard institutional agreement.", createdAt: "2026-08-08T10:00:00.000Z", updatedAt: "2026-10-22T10:00:00.000Z" },
+  { id: "B2B-008", name: "V FOR", contactPerson: "Pooja Hegde", email: "pooja@vforconsultants.com", phone: "9848123456", status: "Active", createdAt: "2026-08-18T10:00:00.000Z", updatedAt: "2026-10-22T10:00:00.000Z" },
+  { id: "B2B-009", name: "KC", contactPerson: "Karthik Chandran", email: "kc@kcedu.com", phone: "9885123456", status: "Active", createdAt: "2026-08-28T10:00:00.000Z", updatedAt: "2026-10-22T10:00:00.000Z" },
+  { id: "B2B-010", name: "IEPL", contactPerson: "Dinesh Reddy", email: "dinesh@iepl.in", phone: "9949123456", status: "Active", createdAt: "2026-09-07T10:00:00.000Z", updatedAt: "2026-10-22T10:00:00.000Z" },
+  { id: "B2B-011", name: "Easy GO", contactPerson: "Sneha Reddy", email: "sneha@easygo.co.in", phone: "9848765432", status: "Active", createdAt: "2026-09-17T10:00:00.000Z", updatedAt: "2026-10-22T10:00:00.000Z" },
+  { id: "B2B-012", name: "VISA AXIS", contactPerson: "Manoj Sharma", email: "manoj@visaaxis.com", phone: "9810123456", status: "Active", createdAt: "2026-09-27T10:00:00.000Z", updatedAt: "2026-10-22T10:00:00.000Z" },
+  { id: "B2B-013", name: "SL", contactPerson: "Lakshmi Narayana", email: "info@sloverseas.org", phone: "9848998877", status: "Inactive", notes: "Temporary pause during renewal.", createdAt: "2026-07-29T10:00:00.000Z", updatedAt: "2026-10-17T10:00:00.000Z" },
+  { id: "B2B-014", name: "SMART SCHLORS", contactPerson: "Ramesh Gupta", email: "ramesh@smartscholars.in", phone: "9820123456", status: "Archived", notes: "Archived after merger.", createdAt: "2025-12-31T10:00:00.000Z", updatedAt: "2026-08-28T10:00:00.000Z" },
+  { id: "B2B-015", name: "Karthi Overseas", contactPerson: "Karthi Sundaram", email: "karthi@karthioverseas.com", phone: "9840123456", status: "Active", createdAt: "2026-10-07T10:00:00.000Z", updatedAt: "2026-10-22T10:00:00.000Z" },
+];
+
 export function createSeed(now = Date.now()) {
   const r = rng(26_09_2026);
 
@@ -348,8 +396,24 @@ export function createSeed(now = Date.now()) {
     const assigned = i < 12 ? employees.find((e) => e.id === "EMP-002")! : employee!;
     const createdAt = now - Math.floor((20 + r() * 250) * 86400000);
     const updatedAt = now - Math.floor(r() * 12 * 86400000);
+    const LOCATIONS = [
+      { state: "Andhra Pradesh", district: "Guntur", villageCity: "Repalle" },
+      { state: "Andhra Pradesh", district: "Krishna", villageCity: "Vijayawada" },
+      { state: "Telangana", district: "Hyderabad", villageCity: "Ameerpet" },
+      { state: "Telangana", district: "Rangareddy", villageCity: "Shamshabad" },
+      { state: "Karnataka", district: "Bengaluru Urban", villageCity: "Koramangala" },
+      { state: "Tamil Nadu", district: "Chennai", villageCity: "Adyar" },
+      { state: "Maharashtra", district: "Pune", villageCity: "Kothrud" },
+      { state: "Delhi", district: "New Delhi", villageCity: "Connaught Place" },
+      { state: "Gujarat", district: "Ahmedabad", villageCity: "Navrangpura" },
+      { state: "Kerala", district: "Ernakulam", villageCity: "Kochi" },
+    ];
+    const loc = LOCATIONS[i % LOCATIONS.length]!;
     const slug = name.toLowerCase().replaceAll(" ", ".");
     const germany = country === "Germany";
+    const rec1 = phone(r);
+    const rec2 = r() > 0.4 ? phone(r) : undefined;
+    const rec3 = r() > 0.7 ? phone(r) : undefined;
     return {
       id,
       name,
@@ -358,6 +422,9 @@ export function createSeed(now = Date.now()) {
       phone2: r() > 0.55 ? phone(r) : "",
       country,
       intake,
+      state: loc.state,
+      district: loc.district,
+      villageCity: loc.villageCity,
       branch,
       college: pick(r, COLLEGES),
       employeeId: assigned.id,
@@ -374,7 +441,10 @@ export function createSeed(now = Date.now()) {
       germanLanguage: germany ? pick(r, ["A1", "A2", "B1", "B2"]) : "None",
       gmailId: `${slug}@gmail.com`,
       gmailPassword: `AbroadAspirants!${pad(i + 11, 2)}`,
-      recoveryNumber: phone(r),
+      recoveryNumber: rec1,
+      recoveryNumber1: rec1,
+      recoveryNumber2: rec2,
+      recoveryNumber3: rec3,
       device: pick(r, DEVICES),
       twoStep: r() > 0.35,
       apsUsername: germany ? `aps.${slug.split(".")[0]}` : undefined,
@@ -406,6 +476,13 @@ export function createSeed(now = Date.now()) {
       gmailId: "rahul.kumar@gmail.com",
       country: "Germany",
       intake: "Oct 2026",
+      state: "Andhra Pradesh",
+      district: "Guntur",
+      villageCity: "Repalle",
+      recoveryNumber: "9848022338",
+      recoveryNumber1: "9848022338",
+      recoveryNumber2: "9876543210",
+      recoveryNumber3: "9123456780",
       branch: "CSE",
       employeeId: "EMP-002",
       status: "Applications Started",
@@ -870,6 +947,8 @@ export function createSeed(now = Date.now()) {
     auditEvents,
     notifications,
     settings,
+    intakes: [...INITIAL_INTAKES],
+    b2bConsultancies: [...INITIAL_B2B_CONSULTANCIES],
   };
 }
 

@@ -19,6 +19,7 @@ import { rulesForCountry, categoryForType } from "@/lib/documents";
 import { openSecret, seal } from "@/lib/credential-crypto";
 import { formatINR } from "@/lib/format";
 import { moneyFieldValue, moneyFromInput, settlePayment, type SettledPayment } from "@/lib/payment";
+import { StudentLocationFields } from "@/components/location/student-location-fields";
 import {
   APPLICATION_STATUSES,
   B2B_CONSULTANCIES,
@@ -30,6 +31,7 @@ import {
   INTAKES,
   STUDENT_DORM_STATUS_OPTIONS,
   englishFromStudent,
+  getStudentRecoveryNumbers,
   scoresForEnglish,
   toTenDigits,
   type ApplicationStatus,
@@ -68,6 +70,10 @@ function emptyDraft(employeeId: string, intake: Intake): Draft {
     phone2: "",
     country: "USA",
     intake,
+    state: "Andhra Pradesh",
+    district: "Guntur",
+    villageCity: "Repalle",
+    isManualLocation: false,
     branch: "CSE",
     college: "",
     employeeId,
@@ -77,6 +83,9 @@ function emptyDraft(employeeId: string, intake: Intake): Draft {
     gmailId: "",
     gmailPassword: "",
     recoveryNumber: "",
+    recoveryNumber1: "",
+    recoveryNumber2: "",
+    recoveryNumber3: "",
     device: "",
     twoStep: false,
     uniAssistFiles: [],
@@ -87,6 +96,8 @@ function emptyDraft(employeeId: string, intake: Intake): Draft {
     paidAmount: 0,
     discount: 0,
     leadType: "Direct",
+    b2bOrg: undefined,
+    otherB2bOrg: undefined,
     notes: "",
   };
 }
@@ -97,25 +108,54 @@ export function StudentFormPage({ studentId }: { studentId?: string }) {
   const employees = useAppStore((s) => s.employees);
   const currentUser = useAppStore((s) => s.currentUser);
   const settings = useAppStore((s) => s.settings);
+  const intakes = useAppStore((s) => s.intakes);
+  const b2bConsultancies = useAppStore((s) => s.b2bConsultancies);
   const createStudent = useAppStore((s) => s.createStudent);
   const updateStudent = useAppStore((s) => s.updateStudent);
   const { base, role } = useWorkspace();
   const navigate = useNavigate();
   const defaultEmp = role === "employee" ? currentUser?.id ?? "" : employees.find((e) => e.role === "employee")?.id ?? "";
   const [step, setStep] = useState(0);
-  const [draft, setDraft] = useState<Draft>(() =>
-    existing
-      ? {
-          ...existing,
-          blockedAccount: existing.blockedAccount || "Not Applied",
-          enrollment: existing.enrollment || "Not Applied",
-          studentDorm: existing.studentDorm || "Not Applied",
-          phone1: toTenDigits(existing.phone1),
-          phone2: toTenDigits(existing.phone2),
-          ...englishFromStudent(existing),
-        }
-      : emptyDraft(defaultEmp, settings.defaultIntake),
-  );
+
+  const activeIntakes = useMemo(() => {
+    const activeList = intakes.filter((i) => i.status === "Active").map((i) => i.name);
+    if (existing?.intake && !activeList.includes(existing.intake)) {
+      return [existing.intake, ...activeList];
+    }
+    return activeList.length > 0 ? activeList : [...INTAKES];
+  }, [intakes, existing?.intake]);
+
+  const activeConsultancies = useMemo(() => {
+    const activeList = b2bConsultancies.filter((c) => c.status === "Active").map((c) => c.name);
+    if (existing?.b2bOrg && existing.b2bOrg !== "Other" && !activeList.includes(existing.b2bOrg)) {
+      return [existing.b2bOrg, ...activeList];
+    }
+    return activeList.length > 0 ? activeList : [...B2B_CONSULTANCIES];
+  }, [b2bConsultancies, existing?.b2bOrg]);
+
+  const [draft, setDraft] = useState<Draft>(() => {
+    if (existing) {
+      const rec = getStudentRecoveryNumbers(existing);
+      return {
+        ...existing,
+        recoveryNumber: rec.recovery1,
+        recoveryNumber1: rec.recovery1,
+        recoveryNumber2: rec.recovery2,
+        recoveryNumber3: rec.recovery3,
+        state: existing.state ?? "Andhra Pradesh",
+        district: existing.district ?? "Guntur",
+        villageCity: existing.villageCity ?? "Repalle",
+        isManualLocation: existing.isManualLocation ?? false,
+        blockedAccount: existing.blockedAccount || "Not Applied",
+        enrollment: existing.enrollment || "Not Applied",
+        studentDorm: existing.studentDorm || "Not Applied",
+        phone1: toTenDigits(existing.phone1),
+        phone2: toTenDigits(existing.phone2),
+        ...englishFromStudent(existing),
+      };
+    }
+    return emptyDraft(defaultEmp, settings.defaultIntake);
+  });
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [saveState, setSaveState] = useState<"idle" | "saving" | "saved" | "unsaved">("idle");
   const [leaveOpen, setLeaveOpen] = useState(false);
@@ -210,6 +250,9 @@ export function StudentFormPage({ studentId }: { studentId?: string }) {
       if (draft.phone2.trim() && !/^\d{10}$/.test(draft.phone2)) e.phone2 = "Phone 2 must be exactly 10 digits";
       if (!draft.college.trim()) e.college = "College is required";
       if (!draft.branch.trim()) e.branch = "Enter the branch name";
+      if (!draft.state?.trim()) e.state = "State is required";
+      if (!draft.district?.trim()) e.district = "District is required";
+      if (!draft.villageCity?.trim()) e.villageCity = "Village / City is required";
     }
     if (key === "academic") {
       if (!draft.cgpa || draft.cgpa < 0) e.cgpa = "Enter CGPA";
@@ -218,7 +261,31 @@ export function StudentFormPage({ studentId }: { studentId?: string }) {
         e.englishScore = "Enter the test score";
       }
     }
-    if (key === "application" && draft.leadType === "B2B" && !draft.b2bOrg?.trim()) e.b2bOrg = "Select a consultancy";
+    if (key === "account") {
+      const rec1 = draft.recoveryNumber1?.trim() || "";
+      if (!rec1) {
+        e.recoveryNumber1 = "Recovery Number 1 is required";
+      } else if (!/^\d{10}$/.test(toTenDigits(rec1))) {
+        e.recoveryNumber1 = "Recovery Number 1 must be exactly 10 digits";
+      }
+      const rec2 = draft.recoveryNumber2?.trim() || "";
+      if (rec2 && !/^\d{10}$/.test(toTenDigits(rec2))) {
+        e.recoveryNumber2 = "Recovery Number 2 must be exactly 10 digits";
+      }
+      const rec3 = draft.recoveryNumber3?.trim() || "";
+      if (rec3 && !/^\d{10}$/.test(toTenDigits(rec3))) {
+        e.recoveryNumber3 = "Recovery Number 3 must be exactly 10 digits";
+      }
+    }
+    if (key === "application") {
+      if (draft.leadType === "B2B") {
+        if (!draft.b2bOrg?.trim()) {
+          e.b2bOrg = "Select a consultancy";
+        } else if (draft.b2bOrg === "Other" && !draft.otherB2bOrg?.trim()) {
+          e.otherB2bOrg = "Other consultancy name is required";
+        }
+      }
+    }
     if (key === "payment") {
       if (draft.totalFee <= 0) e.totalFee = "Enter a fee";
       if (draft.discount > draft.totalFee) e.discount = "Discount cannot be more than the total fee";
@@ -235,7 +302,7 @@ export function StudentFormPage({ studentId }: { studentId?: string }) {
   }
 
   function guardRequired() {
-    for (const key of ["personal", "academic", "application", "payment"] as const) {
+    for (const key of ["personal", "academic", "account", "application", "payment"] as const) {
       const e = issuesFor(key);
       if (Object.keys(e).length) {
         setErrors(e);
@@ -249,6 +316,9 @@ export function StudentFormPage({ studentId }: { studentId?: string }) {
 
   function payload(): Draft {
     const settled = settlePayment(draft.totalFee, draft.discount, draft.paidAmount);
+    const rec1 = toTenDigits(draft.recoveryNumber1 || draft.recoveryNumber || "");
+    const rec2 = draft.recoveryNumber2 ? toTenDigits(draft.recoveryNumber2) : undefined;
+    const rec3 = draft.recoveryNumber3 ? toTenDigits(draft.recoveryNumber3) : undefined;
     const body: Draft = {
       ...draft,
       id: applicationId,
@@ -257,6 +327,16 @@ export function StudentFormPage({ studentId }: { studentId?: string }) {
       paidAmount: settled.paidAmount,
       phone1: toTenDigits(draft.phone1),
       phone2: toTenDigits(draft.phone2),
+      recoveryNumber: rec1,
+      recoveryNumber1: rec1,
+      recoveryNumber2: rec2,
+      recoveryNumber3: rec3,
+      state: draft.state?.trim(),
+      district: draft.district?.trim(),
+      villageCity: draft.villageCity?.trim(),
+      isManualLocation: draft.isManualLocation ?? false,
+      b2bOrg: draft.leadType === "B2B" ? draft.b2bOrg : undefined,
+      otherB2bOrg: draft.leadType === "B2B" && draft.b2bOrg === "Other" ? draft.otherB2bOrg?.trim() : undefined,
       ...scoresForEnglish(draft.englishTest, draft.englishScore),
     };
     if (!canEditSecrets && existing) {
@@ -362,7 +442,7 @@ export function StudentFormPage({ studentId }: { studentId?: string }) {
               type="button"
               onClick={() => {
                 if (i > step) {
-                  for (const key of ["personal", "academic", "application", "payment"] as const) {
+                  for (const key of ["personal", "academic", "account", "application", "payment"] as const) {
                     const at = steps.findIndex((candidate) => candidate.key === key);
                     if (at < 0 || at >= i) continue;
                     const e = issuesFor(key);
@@ -399,11 +479,11 @@ export function StudentFormPage({ studentId }: { studentId?: string }) {
             </FormField>
             <FormField label="Intake" required>
               <Select value={draft.intake} onValueChange={(v) => patch({ intake: v as Intake })}>
-                <SelectTrigger>
+                <SelectTrigger data-testid="intake-select-trigger">
                   <SelectValue />
                 </SelectTrigger>
-                <SelectContent>
-                  {INTAKES.map((i) => (
+                <SelectContent className="max-h-60">
+                  {activeIntakes.map((i) => (
                     <SelectItem key={i} value={i}>
                       {i}
                     </SelectItem>
@@ -426,7 +506,11 @@ export function StudentFormPage({ studentId }: { studentId?: string }) {
               </Select>
             </FormField>
             <FormField label="Name" required error={errors.name}>
-              <Input value={draft.name} onChange={(e) => patch({ name: e.target.value })} />
+              <Input
+                value={draft.name}
+                onChange={(e) => patch({ name: e.target.value })}
+                data-testid="student-name-input"
+              />
             </FormField>
             <FormField label="Phone 1" required error={errors.phone1} hint="10 digits, no country code">
               <Input
@@ -435,6 +519,7 @@ export function StudentFormPage({ studentId }: { studentId?: string }) {
                 value={draft.phone1}
                 placeholder="9876543210"
                 onChange={(e) => patch({ phone1: toTenDigits(e.target.value) })}
+                data-testid="student-phone1-input"
               />
             </FormField>
             <FormField label="Phone 2" error={errors.phone2} hint="Optional, 10 digits">
@@ -448,7 +533,11 @@ export function StudentFormPage({ studentId }: { studentId?: string }) {
             </FormField>
             <BranchField value={draft.branch} onChange={(v) => patch({ branch: v })} error={errors.branch} />
             <FormField label="College / University" required error={errors.college}>
-              <Input value={draft.college} onChange={(e) => patch({ college: e.target.value })} />
+              <Input
+                value={draft.college}
+                onChange={(e) => patch({ college: e.target.value })}
+                data-testid="student-college-input"
+              />
             </FormField>
             {role === "admin" && (
               <FormField label="Lead By">
@@ -466,6 +555,21 @@ export function StudentFormPage({ studentId }: { studentId?: string }) {
                 </Select>
               </FormField>
             )}
+
+            {/* Student Location Section with Cascading Dropdowns */}
+            <StudentLocationFields
+              country="India"
+              state={draft.state}
+              district={draft.district}
+              villageCity={draft.villageCity}
+              isManualLocation={draft.isManualLocation}
+              errors={{
+                state: errors.state,
+                district: errors.district,
+                villageCity: errors.villageCity,
+              }}
+              onChange={(locationPatch) => patch(locationPatch)}
+            />
           </div>
         )}
 
@@ -477,6 +581,7 @@ export function StudentFormPage({ studentId }: { studentId?: string }) {
                 step="0.01"
                 value={draft.cgpa || ""}
                 onChange={(e) => patch({ cgpa: Number(e.target.value) })}
+                data-testid="student-cgpa-input"
               />
             </FormField>
             <FormField label="English test" required error={errors.englishTest}>
@@ -484,7 +589,7 @@ export function StudentFormPage({ studentId }: { studentId?: string }) {
                 value={draft.englishTest}
                 onValueChange={(v) => patch(scoresForEnglish(v as EnglishTest, draft.englishScore))}
               >
-                <SelectTrigger>
+                <SelectTrigger data-testid="student-english-test-select">
                   <SelectValue placeholder="Select test" />
                 </SelectTrigger>
                 <SelectContent>
@@ -503,6 +608,7 @@ export function StudentFormPage({ studentId }: { studentId?: string }) {
                 min={0}
                 value={draft.englishScore ?? ""}
                 placeholder={draft.englishTest === "IELTS" ? "7.0" : "Score"}
+                data-testid="student-english-score-input"
                 onChange={(e) =>
                   patch(
                     scoresForEnglish(
@@ -556,16 +662,74 @@ export function StudentFormPage({ studentId }: { studentId?: string }) {
               or the assigned counselor can reveal them.
             </p>
             <FormField label="Gmail ID">
-              <Input value={draft.gmailId} onChange={(e) => patch({ gmailId: e.target.value, email: e.target.value })} />
+              <Input
+                value={draft.gmailId}
+                onChange={(e) => patch({ gmailId: e.target.value, email: e.target.value })}
+                data-testid="student-gmail-input"
+              />
             </FormField>
             <PasswordField
               label="Gmail password"
               value={canEditSecrets ? draft.gmailPassword : ""}
               onChange={canEditSecrets ? (v) => patch({ gmailPassword: v }) : undefined}
             />
-            <FormField label="Recovery number">
-              <Input value={draft.recoveryNumber} onChange={(e) => patch({ recoveryNumber: e.target.value })} />
-            </FormField>
+            {/* Three Independent Recovery Numbers */}
+            <div className="space-y-3 rounded-xl border bg-muted/10 p-4" data-testid="recovery-numbers-section">
+              <div className="space-y-0.5">
+                <h3 className="text-sm font-semibold">Account Recovery Numbers</h3>
+                <p className="text-xs text-muted-foreground">
+                  Enter up to three independent recovery numbers for account restoration. Enter a 10-digit mobile number without the country code.
+                </p>
+              </div>
+              <div className="grid gap-3 sm:grid-cols-3">
+                <FormField
+                  label="Recovery Number 1"
+                  required
+                  error={errors.recoveryNumber1}
+                  hint="Required, 10 digits"
+                >
+                  <Input
+                    inputMode="numeric"
+                    maxLength={10}
+                    placeholder="9876543210"
+                    value={draft.recoveryNumber1 || ""}
+                    onChange={(e) => {
+                      const digits = toTenDigits(e.target.value);
+                      patch({ recoveryNumber1: digits, recoveryNumber: digits });
+                    }}
+                    data-testid="recovery-number-1-input"
+                  />
+                </FormField>
+                <FormField
+                  label="Recovery Number 2"
+                  error={errors.recoveryNumber2}
+                  hint="Optional, 10 digits"
+                >
+                  <Input
+                    inputMode="numeric"
+                    maxLength={10}
+                    placeholder="Optional 10 digits"
+                    value={draft.recoveryNumber2 || ""}
+                    onChange={(e) => patch({ recoveryNumber2: toTenDigits(e.target.value) })}
+                    data-testid="recovery-number-2-input"
+                  />
+                </FormField>
+                <FormField
+                  label="Recovery Number 3"
+                  error={errors.recoveryNumber3}
+                  hint="Optional, 10 digits"
+                >
+                  <Input
+                    inputMode="numeric"
+                    maxLength={10}
+                    placeholder="Optional 10 digits"
+                    value={draft.recoveryNumber3 || ""}
+                    onChange={(e) => patch({ recoveryNumber3: toTenDigits(e.target.value) })}
+                    data-testid="recovery-number-3-input"
+                  />
+                </FormField>
+              </div>
+            </div>
             <FormField label="Device">
               <Input value={draft.device} onChange={(e) => patch({ device: e.target.value })} />
             </FormField>
@@ -597,10 +761,14 @@ export function StudentFormPage({ studentId }: { studentId?: string }) {
                 <Select
                   value={draft.leadType}
                   onValueChange={(v) =>
-                    patch({ leadType: v as LeadType, b2bOrg: v === "B2B" ? draft.b2bOrg : undefined })
+                    patch({
+                      leadType: v as LeadType,
+                      b2bOrg: v === "B2B" ? draft.b2bOrg : undefined,
+                      otherB2bOrg: v === "B2B" ? draft.otherB2bOrg : undefined,
+                    })
                   }
                 >
-                  <SelectTrigger>
+                  <SelectTrigger data-testid="lead-type-select">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -610,20 +778,41 @@ export function StudentFormPage({ studentId }: { studentId?: string }) {
                 </Select>
               </FormField>
               {draft.leadType === "B2B" && (
-                <FormField label="B2B consultancy" required error={errors.b2bOrg}>
-                  <Select value={draft.b2bOrg || undefined} onValueChange={(v) => patch({ b2bOrg: v })}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select consultancy" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {B2B_CONSULTANCIES.map((name) => (
-                        <SelectItem key={name} value={name}>
-                          {name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </FormField>
+                <>
+                  <FormField label="B2B consultancy" required error={errors.b2bOrg}>
+                    <Select
+                      value={draft.b2bOrg || undefined}
+                      onValueChange={(v) =>
+                        patch({
+                          b2bOrg: v,
+                          otherB2bOrg: v === "Other" ? draft.otherB2bOrg : undefined,
+                        })
+                      }
+                    >
+                      <SelectTrigger data-testid="b2b-consultancy-select">
+                        <SelectValue placeholder="Select consultancy" />
+                      </SelectTrigger>
+                      <SelectContent className="max-h-60">
+                        {activeConsultancies.map((name) => (
+                          <SelectItem key={name} value={name}>
+                            {name}
+                          </SelectItem>
+                        ))}
+                        <SelectItem value="Other">Other</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </FormField>
+                  {draft.b2bOrg === "Other" && (
+                    <FormField label="Other Consultancy Name" required error={errors.otherB2bOrg}>
+                      <Input
+                        placeholder="Enter consultancy name"
+                        value={draft.otherB2bOrg || ""}
+                        onChange={(e) => patch({ otherB2bOrg: e.target.value })}
+                        data-testid="other-b2b-org-input"
+                      />
+                    </FormField>
+                  )}
+                </>
               )}
             </div>
           </div>
@@ -922,6 +1111,9 @@ function ReviewStep({
         <ReviewField label="Email" value={dash(draft.email)} />
         <ReviewField label="Country" value={draft.country} />
         <ReviewField label="Intake" value={draft.intake} />
+        <ReviewField label="State" value={dash(draft.state)} />
+        <ReviewField label="District" value={dash(draft.district)} />
+        <ReviewField label="Village / City" value={dash(draft.villageCity)} />
         <ReviewField label="Branch" value={dash(draft.branch)} />
         <ReviewField label="College / University" value={dash(draft.college)} />
         <ReviewField label="Lead By" value={counselorName} />
@@ -942,7 +1134,9 @@ function ReviewStep({
       <ReviewSection title="03 Account" hint="Sensitive credentials. Reveal only when you need them.">
         <ReviewField label="Gmail ID" value={dash(draft.gmailId)} />
         <PasswordField label="Gmail password" value={canEditSecrets ? draft.gmailPassword : ""} />
-        <ReviewField label="Recovery number" value={dash(draft.recoveryNumber)} />
+        <ReviewField label="Recovery Number 1" value={dash(draft.recoveryNumber1 || draft.recoveryNumber)} />
+        <ReviewField label="Recovery Number 2" value={dash(draft.recoveryNumber2)} />
+        <ReviewField label="Recovery Number 3" value={dash(draft.recoveryNumber3)} />
         <ReviewField label="Device" value={dash(draft.device)} />
         <ReviewField label="2-step verification" value={draft.twoStep ? "Enabled" : "Off"} />
       </ReviewSection>
@@ -950,7 +1144,16 @@ function ReviewStep({
       <ReviewSection title="04 Application">
         <ReviewField label="Application status" value={draft.status} />
         <ReviewField label="Lead type" value={draft.leadType} />
-        <ReviewField label="B2B consultancy" value={draft.leadType === "B2B" ? dash(draft.b2bOrg) : "—"} />
+        <ReviewField
+          label="B2B consultancy"
+          value={
+            draft.leadType === "B2B"
+              ? draft.b2bOrg === "Other"
+                ? `${draft.otherB2bOrg || "Other"} (Other)`
+                : dash(draft.b2bOrg)
+              : "—"
+          }
+        />
       </ReviewSection>
 
       <ReviewSection

@@ -19,6 +19,8 @@ import type {
   AuditSeverity,
   DocumentActivity,
   DocumentVersion,
+  IntakeRecord,
+  B2BConsultancyRecord,
   Lead,
   OrgSettings,
   PaymentRecord,
@@ -182,6 +184,16 @@ export interface AppStore {
   regeneratePortal: (id: string) => StudentDocumentPortal | null;
   logPortalAccess: (portalId: string, action: string, actor?: string) => void;
   touchPortalAccess: (token: string) => void;
+  intakes: IntakeRecord[];
+  b2bConsultancies: B2BConsultancyRecord[];
+  addIntake: (intake: Omit<IntakeRecord, "id" | "createdAt" | "updatedAt">) => { ok: boolean; error?: string; intake?: IntakeRecord };
+  updateIntake: (id: string, patch: Partial<Omit<IntakeRecord, "id" | "createdAt">>) => { ok: boolean; error?: string; intake?: IntakeRecord };
+  deleteIntake: (id: string) => { ok: boolean; error?: string };
+  archiveIntake: (id: string) => void;
+  addB2BConsultancy: (consultancy: Omit<B2BConsultancyRecord, "id" | "createdAt" | "updatedAt">) => { ok: boolean; error?: string; consultancy?: B2BConsultancyRecord };
+  updateB2BConsultancy: (id: string, patch: Partial<Omit<B2BConsultancyRecord, "id" | "createdAt">>) => { ok: boolean; error?: string; consultancy?: B2BConsultancyRecord };
+  deleteB2BConsultancy: (id: string) => { ok: boolean; error?: string };
+  archiveB2BConsultancy: (id: string) => void;
   updateWorkItem: (id: string, patch: Partial<WorkItem>) => void;
   updateSettings: (patch: Partial<OrgSettings>) => void;
   resetDemo: () => void;
@@ -320,6 +332,8 @@ export const useAppStore = create<AppStore>()(
       auditEvents: seed.auditEvents,
       notifications: seed.notifications,
       settings: seed.settings,
+      intakes: seed.intakes ?? [],
+      b2bConsultancies: seed.b2bConsultancies ?? [],
       setHydrated: (v) => set({ hydrated: v }),
       setTheme: (theme) => set({ theme }),
       setSidebarCollapsed: (v) => set({ sidebarCollapsed: v }),
@@ -375,9 +389,12 @@ export const useAppStore = create<AppStore>()(
         const now = new Date().toISOString();
         const settled = settlePayment(data.totalFee, data.discount ?? 0, data.paidAmount ?? 0);
         const paymentStatus: PaymentStatus = settled.status;
+        const recovery1 = data.recoveryNumber1 || data.recoveryNumber || "";
         const student: Student = {
           ...data,
           id,
+          recoveryNumber: recovery1,
+          recoveryNumber1: recovery1,
           totalFee: settled.totalFee,
           discount: settled.discount,
           paidAmount: settled.paidAmount,
@@ -432,7 +449,13 @@ export const useAppStore = create<AppStore>()(
           const now = new Date().toISOString();
           const moneyTouched =
             patch.totalFee !== undefined || patch.paidAmount !== undefined || patch.discount !== undefined;
-          let next: Student = { ...prev, ...patch, updatedAt: now };
+          const rec1 = patch.recoveryNumber1 !== undefined ? patch.recoveryNumber1 : (patch.recoveryNumber !== undefined ? patch.recoveryNumber : undefined);
+          let next: Student = {
+            ...prev,
+            ...patch,
+            ...(rec1 !== undefined ? { recoveryNumber: rec1, recoveryNumber1: rec1 } : {}),
+            updatedAt: now,
+          };
           if (patch.uniAssistFiles) {
             const keep = new Set(patch.uniAssistFiles.map((f) => f.id));
             for (const file of prev.uniAssistFiles ?? []) {
@@ -1383,6 +1406,184 @@ export const useAppStore = create<AppStore>()(
             ],
           };
         }),
+      addIntake: (input) => {
+        const normalized = input.name.trim();
+        if (!normalized) return { ok: false, error: "Intake name is required" };
+        const existing = get().intakes.find((i) => i.name.trim().toLowerCase() === normalized.toLowerCase());
+        if (existing) return { ok: false, error: `An intake named "${normalized}" already exists.` };
+        const now = new Date().toISOString();
+        const newIntake: IntakeRecord = {
+          id: uid("INT"),
+          name: normalized,
+          type: input.type,
+          year: input.year,
+          status: input.status,
+          createdAt: now,
+          updatedAt: now,
+        };
+        set((s) => ({
+          intakes: [newIntake, ...s.intakes],
+          auditEvents: [
+            makeAudit(s, {
+              action: "CREATE",
+              module: "Settings",
+              recordId: newIntake.id,
+              details: `Added new intake: ${newIntake.name} (${newIntake.year})`,
+              severity: "SUCCESS",
+            }),
+            ...s.auditEvents,
+          ],
+        }));
+        return { ok: true, intake: newIntake };
+      },
+      updateIntake: (id, patch) => {
+        const current = get().intakes.find((i) => i.id === id);
+        if (!current) return { ok: false, error: "Intake not found" };
+        if (patch.name) {
+          const normalized = patch.name.trim();
+          if (!normalized) return { ok: false, error: "Intake name is required" };
+          const clash = get().intakes.find((i) => i.id !== id && i.name.trim().toLowerCase() === normalized.toLowerCase());
+          if (clash) return { ok: false, error: `An intake named "${normalized}" already exists.` };
+        }
+        const now = new Date().toISOString();
+        let updatedIntake: IntakeRecord | undefined;
+        set((s) => ({
+          intakes: s.intakes.map((i) => {
+            if (i.id !== id) return i;
+            updatedIntake = { ...i, ...patch, updatedAt: now };
+            return updatedIntake;
+          }),
+          auditEvents: [
+            makeAudit(s, {
+              action: "UPDATE",
+              module: "Settings",
+              recordId: id,
+              details: `Updated intake ${current.name}`,
+              severity: "INFO",
+            }),
+            ...s.auditEvents,
+          ],
+        }));
+        return { ok: true, intake: updatedIntake };
+      },
+      deleteIntake: (id) => {
+        const current = get().intakes.find((i) => i.id === id);
+        if (!current) return { ok: false, error: "Intake not found" };
+        const inUse = get().students.some((s) => s.intake === current.name);
+        if (inUse) {
+          return {
+            ok: false,
+            error: `Cannot delete intake "${current.name}" because it is currently assigned to existing students. Archive it instead.`,
+          };
+        }
+        set((s) => ({
+          intakes: s.intakes.filter((i) => i.id !== id),
+          auditEvents: [
+            makeAudit(s, {
+              action: "DELETE",
+              module: "Settings",
+              recordId: id,
+              details: `Deleted intake ${current.name}`,
+              severity: "WARNING",
+            }),
+            ...s.auditEvents,
+          ],
+        }));
+        return { ok: true };
+      },
+      archiveIntake: (id) => {
+        get().updateIntake(id, { status: "Archived" });
+      },
+      addB2BConsultancy: (input) => {
+        const normalized = input.name.trim();
+        if (!normalized) return { ok: false, error: "Consultancy name is required" };
+        const existing = get().b2bConsultancies.find((c) => c.name.trim().toLowerCase() === normalized.toLowerCase());
+        if (existing) return { ok: false, error: `A consultancy named "${normalized}" already exists.` };
+        const now = new Date().toISOString();
+        const newConsultancy: B2BConsultancyRecord = {
+          id: uid("B2B"),
+          name: normalized,
+          contactPerson: input.contactPerson?.trim() || undefined,
+          email: input.email?.trim() || undefined,
+          phone: input.phone?.trim() || undefined,
+          status: input.status,
+          notes: input.notes?.trim() || undefined,
+          createdAt: now,
+          updatedAt: now,
+        };
+        set((s) => ({
+          b2bConsultancies: [newConsultancy, ...s.b2bConsultancies],
+          auditEvents: [
+            makeAudit(s, {
+              action: "CREATE",
+              module: "Settings",
+              recordId: newConsultancy.id,
+              details: `Added B2B consultancy: ${newConsultancy.name}`,
+              severity: "SUCCESS",
+            }),
+            ...s.auditEvents,
+          ],
+        }));
+        return { ok: true, consultancy: newConsultancy };
+      },
+      updateB2BConsultancy: (id, patch) => {
+        const current = get().b2bConsultancies.find((c) => c.id === id);
+        if (!current) return { ok: false, error: "Consultancy not found" };
+        if (patch.name) {
+          const normalized = patch.name.trim();
+          if (!normalized) return { ok: false, error: "Consultancy name is required" };
+          const clash = get().b2bConsultancies.find((c) => c.id !== id && c.name.trim().toLowerCase() === normalized.toLowerCase());
+          if (clash) return { ok: false, error: `A consultancy named "${normalized}" already exists.` };
+        }
+        const now = new Date().toISOString();
+        let updatedConsultancy: B2BConsultancyRecord | undefined;
+        set((s) => ({
+          b2bConsultancies: s.b2bConsultancies.map((c) => {
+            if (c.id !== id) return c;
+            updatedConsultancy = { ...c, ...patch, updatedAt: now };
+            return updatedConsultancy;
+          }),
+          auditEvents: [
+            makeAudit(s, {
+              action: "UPDATE",
+              module: "Settings",
+              recordId: id,
+              details: `Updated B2B consultancy ${current.name}`,
+              severity: "INFO",
+            }),
+            ...s.auditEvents,
+          ],
+        }));
+        return { ok: true, consultancy: updatedConsultancy };
+      },
+      deleteB2BConsultancy: (id) => {
+        const current = get().b2bConsultancies.find((c) => c.id === id);
+        if (!current) return { ok: false, error: "Consultancy not found" };
+        const inUse = get().students.some((s) => s.leadType === "B2B" && s.b2bOrg === current.name);
+        if (inUse) {
+          return {
+            ok: false,
+            error: `Cannot delete consultancy "${current.name}" because it is linked to existing students. Archive it instead.`,
+          };
+        }
+        set((s) => ({
+          b2bConsultancies: s.b2bConsultancies.filter((c) => c.id !== id),
+          auditEvents: [
+            makeAudit(s, {
+              action: "DELETE",
+              module: "Settings",
+              recordId: id,
+              details: `Deleted B2B consultancy ${current.name}`,
+              severity: "WARNING",
+            }),
+            ...s.auditEvents,
+          ],
+        }));
+        return { ok: true };
+      },
+      archiveB2BConsultancy: (id) => {
+        get().updateB2BConsultancy(id, { status: "Archived" });
+      },
       updateWorkItem: (id, patch) =>
         set((s) => ({
           workItems: s.workItems.map((w) => (w.id === id ? { ...w, ...patch } : w)),
@@ -1436,10 +1637,34 @@ export const useAppStore = create<AppStore>()(
         auditEvents: s.auditEvents,
         notifications: s.notifications,
         settings: s.settings,
+        intakes: s.intakes,
+        b2bConsultancies: s.b2bConsultancies,
       }),
       onRehydrateStorage: () => (state) => {
-        if (state) state.setHydrated(true);
-        else useAppStore.setState({ hydrated: true });
+        if (state) {
+          if (!state.intakes || state.intakes.length === 0) {
+            state.intakes = seed.intakes;
+          }
+          if (!state.b2bConsultancies || state.b2bConsultancies.length === 0) {
+            state.b2bConsultancies = seed.b2bConsultancies;
+          }
+          if (state.students && state.students.length > 0) {
+            state.students = state.students.map((st) => {
+              const recovery1 = st.recoveryNumber1 || st.recoveryNumber || st.phone1;
+              return {
+                ...st,
+                recoveryNumber: recovery1,
+                recoveryNumber1: recovery1,
+                state: st.state ?? "Andhra Pradesh",
+                district: st.district ?? "Guntur",
+                villageCity: st.villageCity ?? "Repalle",
+              };
+            });
+          }
+          state.setHydrated(true);
+        } else {
+          useAppStore.setState({ hydrated: true });
+        }
       },
     },
   ),

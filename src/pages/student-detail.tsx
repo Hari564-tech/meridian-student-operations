@@ -52,6 +52,7 @@ import {
   ENROLLMENT_STATUS_OPTIONS,
   STUDENT_DORM_STATUS_OPTIONS,
   englishFromStudent,
+  getStudentRecoveryGmails,
   getStudentRecoveryNumbers,
   type ApplicationStatus,
   type Student,
@@ -128,6 +129,33 @@ export function StudentDetailPage({ studentId }: { studentId: string }) {
   const counselor = empMap[student.employeeId];
   const offers = applications.filter((a) => a.offerReceived).length;
   const recovery = useMemo(() => getStudentRecoveryNumbers(student), [student]);
+  const recoveryGmails = useMemo(() => getStudentRecoveryGmails(student), [student]);
+
+  const formatStudentEnglishScore = () => {
+    if (!student) return "—";
+    if (student.englishTest === "Not Taken") return "Not Taken";
+    if (student.englishTest === "IELTS & TOEFL" || (typeof student.ielts === "number" && typeof student.toefl === "number")) {
+      return `IELTS: ${student.ielts ?? "—"} · TOEFL: ${student.toefl ?? "—"}`;
+    }
+    if (student.englishTest === "Other") {
+      return `${student.otherEnglishTestName || "Other"}: ${student.otherEnglishTestScore ?? student.englishScore ?? "—"}`;
+    }
+    if (student.englishTest === "IELTS") {
+      return student.ielts != null ? String(student.ielts) : student.englishScore != null ? String(student.englishScore) : "—";
+    }
+    if (student.englishTest === "TOEFL") {
+      return student.toefl != null ? String(student.toefl) : student.englishScore != null ? String(student.englishScore) : "—";
+    }
+    if (student.englishTest === "Duolingo") {
+      return student.duolingo != null ? String(student.duolingo) : student.englishScore != null ? String(student.englishScore) : "—";
+    }
+    if (student.englishTest === "PTE") {
+      return student.pte != null ? String(student.pte) : student.englishScore != null ? String(student.englishScore) : "—";
+    }
+    const eng = englishFromStudent(student);
+    return eng.englishScore != null ? String(eng.englishScore) : "—";
+  };
+
   const initialTab =
     typeof window !== "undefined" &&
     (new URLSearchParams(window.location.search).get("tab") === "documents" ||
@@ -499,6 +527,9 @@ export function StudentDetailPage({ studentId }: { studentId: string }) {
               <Field label="Intake" value={student.intake} />
               <Field label="Branch" value={student.branch} />
               <Field label="College / University" value={student.college} />
+              <Field label="Master's" value={student.mastersDetails || "—"} />
+              <Field label="Lead by Employee" value={counselor?.name ?? "Unassigned"} />
+              <Field label="Referred By" value={student.referredBy || "—"} />
               <Field label="Lead type" value={student.leadType} />
               <Field
                 label="B2B consultancy"
@@ -513,7 +544,6 @@ export function StudentDetailPage({ studentId }: { studentId: string }) {
                 }
               />
               <Field label="Device" value={student.device || "—"} />
-              <Field label="Lead By" value={counselor?.name ?? "Unassigned"} />
               <Field label="Application status" value={student.status} />
               <Field label="Registered" value={formatShortDate(student.createdAt)} />
               <Field label="Last updated" value={relativeTime(student.updatedAt)} />
@@ -524,15 +554,21 @@ export function StudentDetailPage({ studentId }: { studentId: string }) {
               <CardTitle>Academic</CardTitle>
             </CardHeader>
             <CardContent className="grid grid-cols-2 gap-3 text-sm">
-              <Field label="CGPA" value={student.cgpa.toFixed(2)} />
-              <Field label="English test" value={englishFromStudent(student).englishTest ?? "—"} />
+              <Field label="Bachelor's CGPA" value={(student.bachelorsCgpa ?? student.cgpa).toFixed(2)} />
+              <Field label="Master's CGPA" value={student.mastersCgpa ? student.mastersCgpa.toFixed(2) : "—"} />
+              <Field
+                label="English test"
+                value={
+                  student.englishTest === "IELTS & TOEFL" || (student.ielts && student.toefl)
+                    ? "IELTS & TOEFL"
+                    : student.englishTest === "Other"
+                      ? student.otherEnglishTestName || "Other"
+                      : englishFromStudent(student).englishTest ?? "—"
+                }
+              />
               <Field
                 label="English score"
-                value={
-                  englishFromStudent(student).englishScore != null
-                    ? String(englishFromStudent(student).englishScore)
-                    : "—"
-                }
+                value={formatStudentEnglishScore()}
               />
               <Field label="German grade" value={student.germanGrade?.toFixed(1) ?? "—"} />
               <Field label="GRE" value={student.gre?.toString() ?? "—"} />
@@ -553,6 +589,11 @@ export function StudentDetailPage({ studentId }: { studentId: string }) {
               </p>
               <Field label="Gmail ID" value={student.gmailId} />
               <PasswordField label="Gmail password" value={canViewSecrets ? student.gmailPassword : ""} />
+              <div className="grid gap-2 border-t pt-2 sm:grid-cols-3">
+                <Field label="Recovery Gmail 1" value={recoveryGmails.recoveryGmail1 || "—"} />
+                <Field label="Recovery Gmail 2" value={recoveryGmails.recoveryGmail2 || "—"} />
+                <Field label="Recovery Gmail 3" value={recoveryGmails.recoveryGmail3 || "—"} />
+              </div>
               <Field
                 label="Recovery Number 1 (Primary)"
                 value={canViewSecrets ? (recovery.recovery1 || "—") : (recovery.recovery1 ? "••••••••••" : "—")}
@@ -598,15 +639,21 @@ export function StudentDetailPage({ studentId }: { studentId: string }) {
         <TabsContent value="academic">
           <Card>
             <CardContent className="grid gap-4 p-5 sm:grid-cols-2 lg:grid-cols-4">
-              <Field label="CGPA" value={student.cgpa.toFixed(2)} />
-              <Field label="English test" value={englishFromStudent(student).englishTest ?? "—"} />
+              <Field label="Bachelor's CGPA" value={(student.bachelorsCgpa ?? student.cgpa).toFixed(2)} />
+              <Field label="Master's CGPA" value={student.mastersCgpa ? student.mastersCgpa.toFixed(2) : "—"} />
+              <Field
+                label="English test"
+                value={
+                  student.englishTest === "IELTS & TOEFL" || (student.ielts && student.toefl)
+                    ? "IELTS & TOEFL"
+                    : student.englishTest === "Other"
+                      ? student.otherEnglishTestName || "Other"
+                      : englishFromStudent(student).englishTest ?? "—"
+                }
+              />
               <Field
                 label="English score"
-                value={
-                  englishFromStudent(student).englishScore != null
-                    ? String(englishFromStudent(student).englishScore)
-                    : "—"
-                }
+                value={formatStudentEnglishScore()}
               />
               <Field label="German grade" value={student.germanGrade?.toFixed(1) ?? "—"} />
               <Field label="GRE" value={student.gre?.toString() ?? "—"} />

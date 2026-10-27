@@ -72,7 +72,8 @@ export function cgpaToGermanGrade(cgpa: number, scale = 10) {
 
 export function studentGermanGrade(student: Student) {
   if (typeof student.germanGrade === "number") return student.germanGrade;
-  return cgpaToGermanGrade(student.cgpa);
+  const gradeCgpa = student.bachelorsCgpa ?? student.cgpa;
+  return cgpaToGermanGrade(gradeCgpa);
 }
 
 function greFloor(value: string) {
@@ -83,19 +84,27 @@ function greFloor(value: string) {
 }
 
 export function formatEnglishProfile(student: Student) {
+  if (student.englishTest === "Not Taken") {
+    return "Not Taken";
+  }
   const parts: string[] = [];
-  if (
+  if (typeof student.ielts === "number") parts.push(`IELTS ${student.ielts}`);
+  if (typeof student.toefl === "number") parts.push(`TOEFL ${student.toefl}`);
+  if (typeof student.duolingo === "number") parts.push(`Duolingo ${student.duolingo}`);
+  if (typeof student.pte === "number") parts.push(`PTE ${student.pte}`);
+  if (student.otherEnglishTestName && typeof student.otherEnglishTestScore === "number") {
+    parts.push(`${student.otherEnglishTestName} ${student.otherEnglishTestScore}`);
+  } else if (
     student.englishTest &&
     typeof student.englishScore === "number" &&
     student.englishTest !== "IELTS" &&
     student.englishTest !== "TOEFL" &&
-    student.englishTest !== "Duolingo"
+    student.englishTest !== "Duolingo" &&
+    student.englishTest !== "PTE" &&
+    student.englishTest !== "IELTS & TOEFL"
   ) {
     parts.push(`${student.englishTest} ${student.englishScore}`);
   }
-  if (typeof student.ielts === "number") parts.push(`IELTS ${student.ielts}`);
-  if (typeof student.toefl === "number") parts.push(`TOEFL ${student.toefl}`);
-  if (typeof student.duolingo === "number") parts.push(`Duolingo ${student.duolingo}`);
   return parts.join(" · ") || "Not submitted";
 }
 
@@ -198,9 +207,11 @@ export function matchStudentToUniversity(student: Student, university: Universit
   let englishDetail = "No recognised English score on file.";
   if (englishTestOk) {
     englishStatus = "met";
-    englishDetail = ieltsOk
-      ? `IELTS ${student.ielts} meets the ${university.ielts} minimum.`
-      : `TOEFL ${student.toefl} meets the ${university.toefl} minimum.`;
+    englishDetail = ieltsOk && toeflOk
+      ? `IELTS ${student.ielts} and TOEFL ${student.toefl} meet the minimum requirements.`
+      : ieltsOk
+        ? `IELTS ${student.ielts} meets the ${university.ielts} minimum.`
+        : `TOEFL ${student.toefl} meets the ${university.toefl} minimum.`;
     score += 20;
     reasons.push(englishDetail);
   } else if (moiCovers) {

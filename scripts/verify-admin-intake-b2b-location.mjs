@@ -168,13 +168,15 @@ async function run() {
     await page.waitForTimeout(500);
 
     // Fill Academic
-    await page.fill("[data-testid='student-cgpa-input']", "8.75");
+    const cgpaInput = page.locator("[data-testid='student-bachelors-cgpa-input']").or(page.locator("[data-testid='student-cgpa-input']")).first();
+    await cgpaInput.fill("8.75");
     const englishTestTrigger = page.locator("[data-testid='student-english-test-select']");
     await englishTestTrigger.click();
     await page.waitForTimeout(300);
-    await page.locator("[role='option']:has-text('IELTS')").click();
+    await page.locator("[role='option']:has-text('IELTS')").first().click();
     await page.waitForTimeout(300);
-    await page.fill("[data-testid='student-english-score-input']", "7.5");
+    const scoreInput = page.locator("[data-testid='student-ielts-score-input']").or(page.locator("[data-testid='student-english-score-input']")).first();
+    await scoreInput.fill("7.5");
 
     // Click Continue to Account
     await page.click("button:has-text('Continue')");

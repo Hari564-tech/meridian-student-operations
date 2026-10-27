@@ -31,7 +31,9 @@ import {
   INTAKES,
   STUDENT_DORM_STATUS_OPTIONS,
   englishFromStudent,
+  getStudentRecoveryGmails,
   getStudentRecoveryNumbers,
+  isValidEmail,
   scoresForEnglish,
   toTenDigits,
   type ApplicationStatus,
@@ -76,9 +78,21 @@ function emptyDraft(employeeId: string, intake: Intake): Draft {
     isManualLocation: false,
     branch: "CSE",
     college: "",
+    mastersDetails: "",
+    referredBy: "",
     employeeId,
     status: "Added newly",
     cgpa: 0,
+    bachelorsCgpa: undefined,
+    mastersCgpa: undefined,
+    englishTest: undefined,
+    englishScore: undefined,
+    ielts: undefined,
+    toefl: undefined,
+    duolingo: undefined,
+    pte: undefined,
+    otherEnglishTestName: "",
+    otherEnglishTestScore: undefined,
     germanLanguage: "None",
     gmailId: "",
     gmailPassword: "",
@@ -86,6 +100,9 @@ function emptyDraft(employeeId: string, intake: Intake): Draft {
     recoveryNumber1: "",
     recoveryNumber2: "",
     recoveryNumber3: "",
+    recoveryGmail1: "",
+    recoveryGmail2: "",
+    recoveryGmail3: "",
     device: "",
     twoStep: false,
     uniAssistFiles: [],
@@ -136,12 +153,22 @@ export function StudentFormPage({ studentId }: { studentId?: string }) {
   const [draft, setDraft] = useState<Draft>(() => {
     if (existing) {
       const rec = getStudentRecoveryNumbers(existing);
+      const recGmails = getStudentRecoveryGmails(existing);
+      const bCgpa = existing.bachelorsCgpa ?? (existing.cgpa > 0 ? existing.cgpa : undefined);
       return {
         ...existing,
+        bachelorsCgpa: bCgpa,
+        mastersCgpa: existing.mastersCgpa,
+        cgpa: bCgpa ?? existing.cgpa,
+        referredBy: existing.referredBy ?? "",
+        mastersDetails: existing.mastersDetails ?? "",
         recoveryNumber: rec.recovery1,
         recoveryNumber1: rec.recovery1,
         recoveryNumber2: rec.recovery2,
         recoveryNumber3: rec.recovery3,
+        recoveryGmail1: recGmails.recoveryGmail1,
+        recoveryGmail2: recGmails.recoveryGmail2,
+        recoveryGmail3: recGmails.recoveryGmail3,
         state: existing.state ?? "Andhra Pradesh",
         district: existing.district ?? "Guntur",
         villageCity: existing.villageCity ?? "Repalle",
@@ -151,6 +178,8 @@ export function StudentFormPage({ studentId }: { studentId?: string }) {
         studentDorm: existing.studentDorm || "Not Applied",
         phone1: toTenDigits(existing.phone1),
         phone2: toTenDigits(existing.phone2),
+        otherEnglishTestName: existing.otherEnglishTestName ?? "",
+        otherEnglishTestScore: existing.otherEnglishTestScore,
         ...englishFromStudent(existing),
       };
     }
@@ -255,10 +284,56 @@ export function StudentFormPage({ studentId }: { studentId?: string }) {
       if (!draft.villageCity?.trim()) e.villageCity = "Village / City is required";
     }
     if (key === "academic") {
-      if (!draft.cgpa || draft.cgpa < 0) e.cgpa = "Enter CGPA";
-      if (!draft.englishTest) e.englishTest = "Select an English test";
-      if (draft.englishScore == null || Number.isNaN(Number(draft.englishScore)) || Number(draft.englishScore) <= 0) {
-        e.englishScore = "Enter the test score";
+      const bCgpa = draft.bachelorsCgpa ?? draft.cgpa;
+      if (bCgpa == null || Number.isNaN(Number(bCgpa)) || Number(bCgpa) <= 0) {
+        e.bachelorsCgpa = "Bachelor's CGPA is required";
+      } else if (Number(bCgpa) > 10) {
+        e.bachelorsCgpa = "Bachelor's CGPA must be between 0 and 10";
+      }
+
+      if (draft.mastersCgpa != null && draft.mastersCgpa !== ("" as unknown as number)) {
+        const m = Number(draft.mastersCgpa);
+        if (Number.isNaN(m) || m <= 0 || m > 10) {
+          e.mastersCgpa = "Master's CGPA must be between 0 and 10";
+        }
+      }
+
+      if (!draft.englishTest) {
+        e.englishTest = "Select an English test";
+      } else if (draft.englishTest === "IELTS") {
+        if (draft.ielts == null || Number.isNaN(Number(draft.ielts)) || Number(draft.ielts) <= 0 || Number(draft.ielts) > 9) {
+          e.ielts = "Enter an IELTS score between 0 and 9.0";
+        }
+      } else if (draft.englishTest === "TOEFL") {
+        if (draft.toefl == null || Number.isNaN(Number(draft.toefl)) || Number(draft.toefl) <= 0 || Number(draft.toefl) > 120) {
+          e.toefl = "Enter a TOEFL score between 0 and 120";
+        }
+      } else if (draft.englishTest === "IELTS & TOEFL") {
+        if (draft.ielts == null || Number.isNaN(Number(draft.ielts)) || Number(draft.ielts) <= 0 || Number(draft.ielts) > 9) {
+          e.ielts = "Enter an IELTS score between 0 and 9.0";
+        }
+        if (draft.toefl == null || Number.isNaN(Number(draft.toefl)) || Number(draft.toefl) <= 0 || Number(draft.toefl) > 120) {
+          e.toefl = "Enter a TOEFL score between 0 and 120";
+        }
+      } else if (draft.englishTest === "Duolingo") {
+        if (draft.duolingo == null || Number.isNaN(Number(draft.duolingo)) || Number(draft.duolingo) <= 0 || Number(draft.duolingo) > 160) {
+          e.duolingo = "Enter a Duolingo score between 0 and 160";
+        }
+      } else if (draft.englishTest === "PTE") {
+        if (draft.pte == null || Number.isNaN(Number(draft.pte)) || Number(draft.pte) < 10 || Number(draft.pte) > 90) {
+          e.pte = "Enter a PTE score between 10 and 90";
+        }
+      } else if (draft.englishTest === "Other") {
+        if (!draft.otherEnglishTestName?.trim()) {
+          e.otherEnglishTestName = "Other test name is required";
+        }
+        if (
+          (draft.otherEnglishTestScore == null && draft.englishScore == null) ||
+          Number.isNaN(Number(draft.otherEnglishTestScore ?? draft.englishScore)) ||
+          Number(draft.otherEnglishTestScore ?? draft.englishScore) <= 0
+        ) {
+          e.otherEnglishTestScore = "Enter the test score";
+        }
       }
     }
     if (key === "account") {
@@ -275,6 +350,21 @@ export function StudentFormPage({ studentId }: { studentId?: string }) {
       const rec3 = draft.recoveryNumber3?.trim() || "";
       if (rec3 && !/^\d{10}$/.test(toTenDigits(rec3))) {
         e.recoveryNumber3 = "Recovery Number 3 must be exactly 10 digits";
+      }
+
+      const recGm1 = draft.recoveryGmail1?.trim() || "";
+      if (!recGm1) {
+        e.recoveryGmail1 = "Recovery Gmail 1 is required";
+      } else if (!isValidEmail(recGm1)) {
+        e.recoveryGmail1 = "Enter a valid email address";
+      }
+      const recGm2 = draft.recoveryGmail2?.trim() || "";
+      if (recGm2 && !isValidEmail(recGm2)) {
+        e.recoveryGmail2 = "Enter a valid email address";
+      }
+      const recGm3 = draft.recoveryGmail3?.trim() || "";
+      if (recGm3 && !isValidEmail(recGm3)) {
+        e.recoveryGmail3 = "Enter a valid email address";
       }
     }
     if (key === "application") {
@@ -319,9 +409,18 @@ export function StudentFormPage({ studentId }: { studentId?: string }) {
     const rec1 = toTenDigits(draft.recoveryNumber1 || draft.recoveryNumber || "");
     const rec2 = draft.recoveryNumber2 ? toTenDigits(draft.recoveryNumber2) : undefined;
     const rec3 = draft.recoveryNumber3 ? toTenDigits(draft.recoveryNumber3) : undefined;
+    const bCgpa = draft.bachelorsCgpa !== undefined && draft.bachelorsCgpa !== null ? Number(draft.bachelorsCgpa) : draft.cgpa;
     const body: Draft = {
       ...draft,
       id: applicationId,
+      cgpa: bCgpa,
+      bachelorsCgpa: bCgpa,
+      mastersCgpa: draft.mastersCgpa != null && !Number.isNaN(Number(draft.mastersCgpa)) && Number(draft.mastersCgpa) > 0 ? Number(draft.mastersCgpa) : undefined,
+      referredBy: draft.referredBy?.trim() || undefined,
+      mastersDetails: draft.mastersDetails?.trim() || undefined,
+      recoveryGmail1: draft.recoveryGmail1?.trim() || undefined,
+      recoveryGmail2: draft.recoveryGmail2?.trim() || undefined,
+      recoveryGmail3: draft.recoveryGmail3?.trim() || undefined,
       totalFee: settled.totalFee,
       discount: settled.discount,
       paidAmount: settled.paidAmount,
@@ -337,7 +436,14 @@ export function StudentFormPage({ studentId }: { studentId?: string }) {
       isManualLocation: draft.isManualLocation ?? false,
       b2bOrg: draft.leadType === "B2B" ? draft.b2bOrg : undefined,
       otherB2bOrg: draft.leadType === "B2B" && draft.b2bOrg === "Other" ? draft.otherB2bOrg?.trim() : undefined,
-      ...scoresForEnglish(draft.englishTest, draft.englishScore),
+      ...scoresForEnglish(draft.englishTest as EnglishTest | undefined, draft.englishScore, {
+        ielts: draft.ielts,
+        toefl: draft.toefl,
+        duolingo: draft.duolingo,
+        pte: draft.pte,
+        otherName: draft.otherEnglishTestName,
+        otherScore: draft.otherEnglishTestScore,
+      }),
     };
     if (!canEditSecrets && existing) {
       body.gmailPassword = existing.gmailPassword;
@@ -535,15 +641,24 @@ export function StudentFormPage({ studentId }: { studentId?: string }) {
             <FormField label="College / University" required error={errors.college}>
               <Input
                 value={draft.college}
+                placeholder="Enter college or university"
                 onChange={(e) => patch({ college: e.target.value })}
                 data-testid="student-college-input"
               />
             </FormField>
-            {role === "admin" && (
-              <FormField label="Lead By">
+            <FormField label="Master's" hint="Optional">
+              <Input
+                value={draft.mastersDetails ?? ""}
+                placeholder="Enter Master's details (optional)"
+                onChange={(e) => patch({ mastersDetails: e.target.value })}
+                data-testid="student-masters-details-input"
+              />
+            </FormField>
+            <FormField label="Lead by Employee" required>
+              {role === "admin" ? (
                 <Select value={draft.employeeId} onValueChange={(v) => patch({ employeeId: v })}>
-                  <SelectTrigger>
-                    <SelectValue />
+                  <SelectTrigger data-testid="student-employee-select">
+                    <SelectValue placeholder="Select counselor" />
                   </SelectTrigger>
                   <SelectContent>
                     {counselors.map((e) => (
@@ -553,8 +668,23 @@ export function StudentFormPage({ studentId }: { studentId?: string }) {
                     ))}
                   </SelectContent>
                 </Select>
-              </FormField>
-            )}
+              ) : (
+                <Input
+                  value={counselors.find((e) => e.id === draft.employeeId)?.name ?? currentUser?.name ?? "Assigned Counselor"}
+                  disabled
+                  className="bg-muted text-muted-foreground"
+                  data-testid="student-employee-readonly"
+                />
+              )}
+            </FormField>
+            <FormField label="Referred By" hint="Optional">
+              <Input
+                value={draft.referredBy ?? ""}
+                placeholder="Enter referrer's name"
+                onChange={(e) => patch({ referredBy: e.target.value })}
+                data-testid="student-referred-by-input"
+              />
+            </FormField>
 
             {/* Student Location Section with Cascading Dropdowns */}
             <StudentLocationFields
@@ -575,19 +705,52 @@ export function StudentFormPage({ studentId }: { studentId?: string }) {
 
         {stepKey === "academic" && (
           <div className="grid gap-4 sm:grid-cols-2">
-            <FormField label="CGPA" required error={errors.cgpa}>
+            <FormField label="Bachelor's CGPA" required error={errors.bachelorsCgpa} hint="0.00 – 10.00 scale">
               <Input
                 type="number"
                 step="0.01"
-                value={draft.cgpa || ""}
-                onChange={(e) => patch({ cgpa: Number(e.target.value) })}
-                data-testid="student-cgpa-input"
+                min="0"
+                max="10"
+                placeholder="e.g. 8.25"
+                value={draft.bachelorsCgpa ?? (draft.cgpa ? draft.cgpa : "")}
+                onChange={(e) => {
+                  const val = e.target.value === "" ? undefined : Number(e.target.value);
+                  patch({ bachelorsCgpa: val, cgpa: val ?? 0 });
+                }}
+                data-testid="student-bachelors-cgpa-input"
               />
             </FormField>
-            <FormField label="English test" required error={errors.englishTest}>
+
+            <FormField label="Master's CGPA" error={errors.mastersCgpa} hint="Optional, 0.00 – 10.00 scale">
+              <Input
+                type="number"
+                step="0.01"
+                min="0"
+                max="10"
+                placeholder="Enter Master's CGPA (optional)"
+                value={draft.mastersCgpa ?? ""}
+                onChange={(e) => {
+                  const val = e.target.value === "" ? undefined : Number(e.target.value);
+                  patch({ mastersCgpa: val });
+                }}
+                data-testid="student-masters-cgpa-input"
+              />
+            </FormField>
+
+            <FormField label="English test" required error={errors.englishTest} className="sm:col-span-2">
               <Select
                 value={draft.englishTest}
-                onValueChange={(v) => patch(scoresForEnglish(v as EnglishTest, draft.englishScore))}
+                onValueChange={(v) => {
+                  const test = v as EnglishTest;
+                  patch(scoresForEnglish(test, undefined, {
+                    ielts: test === "IELTS & TOEFL" || test === "IELTS" ? draft.ielts : undefined,
+                    toefl: test === "IELTS & TOEFL" || test === "TOEFL" ? draft.toefl : undefined,
+                    duolingo: test === "Duolingo" ? draft.duolingo : undefined,
+                    pte: test === "PTE" ? draft.pte : undefined,
+                    otherName: test === "Other" ? draft.otherEnglishTestName : undefined,
+                    otherScore: test === "Other" ? draft.otherEnglishTestScore : undefined,
+                  }));
+                }}
               >
                 <SelectTrigger data-testid="student-english-test-select">
                   <SelectValue placeholder="Select test" />
@@ -601,24 +764,141 @@ export function StudentFormPage({ studentId }: { studentId?: string }) {
                 </SelectContent>
               </Select>
             </FormField>
-            <FormField label="English test score" required error={errors.englishScore}>
-              <Input
-                type="number"
-                step={draft.englishTest === "IELTS" ? "0.5" : "1"}
-                min={0}
-                value={draft.englishScore ?? ""}
-                placeholder={draft.englishTest === "IELTS" ? "7.0" : "Score"}
-                data-testid="student-english-score-input"
-                onChange={(e) =>
-                  patch(
-                    scoresForEnglish(
-                      draft.englishTest,
-                      e.target.value === "" ? undefined : Number(e.target.value),
-                    ),
-                  )
-                }
-              />
-            </FormField>
+
+            {draft.englishTest === "IELTS" && (
+              <FormField label="IELTS Score" required error={errors.ielts} hint="0.0 – 9.0 in 0.5 steps" className="sm:col-span-2">
+                <Input
+                  type="number"
+                  step="0.5"
+                  min="0"
+                  max="9"
+                  placeholder="e.g. 7.5"
+                  value={draft.ielts ?? draft.englishScore ?? ""}
+                  data-testid="student-ielts-score-input"
+                  onChange={(e) => {
+                    const score = e.target.value === "" ? undefined : Number(e.target.value);
+                    patch({ ielts: score, englishScore: score });
+                  }}
+                />
+              </FormField>
+            )}
+
+            {draft.englishTest === "TOEFL" && (
+              <FormField label="TOEFL Score" required error={errors.toefl} hint="0 – 120" className="sm:col-span-2">
+                <Input
+                  type="number"
+                  step="1"
+                  min="0"
+                  max="120"
+                  placeholder="e.g. 95"
+                  value={draft.toefl ?? draft.englishScore ?? ""}
+                  data-testid="student-toefl-score-input"
+                  onChange={(e) => {
+                    const score = e.target.value === "" ? undefined : Number(e.target.value);
+                    patch({ toefl: score, englishScore: score });
+                  }}
+                />
+              </FormField>
+            )}
+
+            {draft.englishTest === "IELTS & TOEFL" && (
+              <div className="grid gap-4 sm:grid-cols-2 sm:col-span-2">
+                <FormField label="IELTS Score" required error={errors.ielts} hint="0.0 – 9.0 in 0.5 steps">
+                  <Input
+                    type="number"
+                    step="0.5"
+                    min="0"
+                    max="9"
+                    placeholder="e.g. 7.5"
+                    value={draft.ielts ?? ""}
+                    data-testid="student-dual-ielts-score-input"
+                    onChange={(e) => {
+                      const score = e.target.value === "" ? undefined : Number(e.target.value);
+                      patch({ ielts: score });
+                    }}
+                  />
+                </FormField>
+                <FormField label="TOEFL Score" required error={errors.toefl} hint="0 – 120">
+                  <Input
+                    type="number"
+                    step="1"
+                    min="0"
+                    max="120"
+                    placeholder="e.g. 95"
+                    value={draft.toefl ?? ""}
+                    data-testid="student-dual-toefl-score-input"
+                    onChange={(e) => {
+                      const score = e.target.value === "" ? undefined : Number(e.target.value);
+                      patch({ toefl: score });
+                    }}
+                  />
+                </FormField>
+              </div>
+            )}
+
+            {draft.englishTest === "Duolingo" && (
+              <FormField label="Duolingo Score" required error={errors.duolingo} hint="0 – 160" className="sm:col-span-2">
+                <Input
+                  type="number"
+                  step="1"
+                  min="0"
+                  max="160"
+                  placeholder="e.g. 115"
+                  value={draft.duolingo ?? draft.englishScore ?? ""}
+                  data-testid="student-duolingo-score-input"
+                  onChange={(e) => {
+                    const score = e.target.value === "" ? undefined : Number(e.target.value);
+                    patch({ duolingo: score, englishScore: score });
+                  }}
+                />
+              </FormField>
+            )}
+
+            {draft.englishTest === "PTE" && (
+              <FormField label="PTE Score" required error={errors.pte} hint="10 – 90" className="sm:col-span-2">
+                <Input
+                  type="number"
+                  step="1"
+                  min="10"
+                  max="90"
+                  placeholder="e.g. 68"
+                  value={draft.pte ?? draft.englishScore ?? ""}
+                  data-testid="student-pte-score-input"
+                  onChange={(e) => {
+                    const score = e.target.value === "" ? undefined : Number(e.target.value);
+                    patch({ pte: score, englishScore: score });
+                  }}
+                />
+              </FormField>
+            )}
+
+            {draft.englishTest === "Other" && (
+              <div className="grid gap-4 sm:grid-cols-2 sm:col-span-2">
+                <FormField label="Other English Test Name" required error={errors.otherEnglishTestName}>
+                  <Input
+                    placeholder="e.g. OET, Cambridge English"
+                    value={draft.otherEnglishTestName ?? ""}
+                    data-testid="student-other-test-name-input"
+                    onChange={(e) => patch({ otherEnglishTestName: e.target.value })}
+                  />
+                </FormField>
+                <FormField label="Other English Test Score" required error={errors.otherEnglishTestScore}>
+                  <Input
+                    type="number"
+                    step="0.1"
+                    min="0"
+                    placeholder="Score"
+                    value={draft.otherEnglishTestScore ?? draft.englishScore ?? ""}
+                    data-testid="student-other-test-score-input"
+                    onChange={(e) => {
+                      const score = e.target.value === "" ? undefined : Number(e.target.value);
+                      patch({ otherEnglishTestScore: score, englishScore: score });
+                    }}
+                  />
+                </FormField>
+              </div>
+            )}
+
             {germany && (
               <FormField label="German grade">
                 <Input
@@ -673,6 +953,59 @@ export function StudentFormPage({ studentId }: { studentId?: string }) {
               value={canEditSecrets ? draft.gmailPassword : ""}
               onChange={canEditSecrets ? (v) => patch({ gmailPassword: v }) : undefined}
             />
+
+            {/* Three Independent Recovery Gmail Addresses */}
+            <div className="space-y-3 rounded-xl border bg-muted/10 p-4" data-testid="recovery-gmail-section">
+              <div className="space-y-0.5">
+                <h3 className="text-sm font-semibold">Account Recovery Gmail Addresses</h3>
+                <p className="text-xs text-muted-foreground">
+                  Enter up to three independent recovery Gmail addresses for account restoration. Recovery Gmail 1 is mandatory.
+                </p>
+              </div>
+              <div className="grid gap-3 sm:grid-cols-3">
+                <FormField
+                  label="Recovery Gmail 1"
+                  required
+                  error={errors.recoveryGmail1}
+                  hint="Mandatory email"
+                >
+                  <Input
+                    type="email"
+                    placeholder="e.g. recovery1@gmail.com"
+                    value={draft.recoveryGmail1 || ""}
+                    onChange={(e) => patch({ recoveryGmail1: e.target.value.trim() })}
+                    data-testid="recovery-gmail-1-input"
+                  />
+                </FormField>
+                <FormField
+                  label="Recovery Gmail 2"
+                  error={errors.recoveryGmail2}
+                  hint="Optional email"
+                >
+                  <Input
+                    type="email"
+                    placeholder="e.g. recovery2@gmail.com"
+                    value={draft.recoveryGmail2 || ""}
+                    onChange={(e) => patch({ recoveryGmail2: e.target.value.trim() })}
+                    data-testid="recovery-gmail-2-input"
+                  />
+                </FormField>
+                <FormField
+                  label="Recovery Gmail 3"
+                  error={errors.recoveryGmail3}
+                  hint="Optional email"
+                >
+                  <Input
+                    type="email"
+                    placeholder="e.g. recovery3@gmail.com"
+                    value={draft.recoveryGmail3 || ""}
+                    onChange={(e) => patch({ recoveryGmail3: e.target.value.trim() })}
+                    data-testid="recovery-gmail-3-input"
+                  />
+                </FormField>
+              </div>
+            </div>
+
             {/* Three Independent Recovery Numbers */}
             <div className="space-y-3 rounded-xl border bg-muted/10 p-4" data-testid="recovery-numbers-section">
               <div className="space-y-0.5">
@@ -988,6 +1321,7 @@ export function StudentFormPage({ studentId }: { studentId?: string }) {
             counselorName={counselors.find((e) => e.id === draft.employeeId)?.name ?? "Unassigned"}
             canEditSecrets={canEditSecrets}
             onNotes={(notes) => patch({ notes })}
+            onNavigateStep={(s) => setStep(s)}
           />
         )}
 
@@ -1068,15 +1402,31 @@ function ReviewSection({
   hint,
   children,
   wide,
+  onEdit,
 }: {
   title: string;
   hint?: string;
   children: ReactNode;
   wide?: boolean;
+  onEdit?: () => void;
 }) {
   return (
     <section className={cn("rounded-xl border bg-secondary/20 p-4", wide && "sm:col-span-2")}>
-      <h3 className="text-sm font-semibold">{title}</h3>
+      <div className="flex items-center justify-between">
+        <h3 className="text-sm font-semibold">{title}</h3>
+        {onEdit && (
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            onClick={onEdit}
+            className="h-7 px-2 text-xs font-medium text-primary hover:text-primary hover:bg-primary/10"
+            data-testid={`review-edit-${title.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`}
+          >
+            Edit
+          </Button>
+        )}
+      </div>
       {hint && <p className="mt-1 text-xs text-muted-foreground">{hint}</p>}
       <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">{children}</div>
     </section>
@@ -1090,6 +1440,7 @@ function ReviewStep({
   counselorName,
   canEditSecrets,
   onNotes,
+  onNavigateStep,
 }: {
   draft: Draft;
   applicationId: string;
@@ -1097,13 +1448,37 @@ function ReviewStep({
   counselorName: string;
   canEditSecrets: boolean;
   onNotes: (notes: string) => void;
+  onNavigateStep: (stepIndex: number) => void;
 }) {
   const english = englishFromStudent(draft);
   const documents = rulesForCountry(draft.country);
 
+  const formatReviewEnglishScore = () => {
+    if (draft.englishTest === "Not Taken") return "Not Taken";
+    if (draft.englishTest === "IELTS & TOEFL") {
+      return `IELTS: ${draft.ielts ?? "—"} · TOEFL: ${draft.toefl ?? "—"}`;
+    }
+    if (draft.englishTest === "Other") {
+      return `${draft.otherEnglishTestName || "Other"}: ${draft.otherEnglishTestScore ?? draft.englishScore ?? "—"}`;
+    }
+    if (draft.englishTest === "IELTS") {
+      return draft.ielts != null ? String(draft.ielts) : draft.englishScore != null ? String(draft.englishScore) : "—";
+    }
+    if (draft.englishTest === "TOEFL") {
+      return draft.toefl != null ? String(draft.toefl) : draft.englishScore != null ? String(draft.englishScore) : "—";
+    }
+    if (draft.englishTest === "Duolingo") {
+      return draft.duolingo != null ? String(draft.duolingo) : draft.englishScore != null ? String(draft.englishScore) : "—";
+    }
+    if (draft.englishTest === "PTE") {
+      return draft.pte != null ? String(draft.pte) : draft.englishScore != null ? String(draft.englishScore) : "—";
+    }
+    return english.englishScore != null ? String(english.englishScore) : "—";
+  };
+
   return (
     <div className="grid gap-4 sm:grid-cols-2">
-      <ReviewSection title="01 Personal">
+      <ReviewSection title="01 Personal" onEdit={() => onNavigateStep(0)}>
         <ReviewField label="Application ID" value={applicationId} />
         <ReviewField label="Name" value={dash(draft.name)} />
         <ReviewField label="Phone 1" value={dash(draft.phone1)} />
@@ -1116,24 +1491,36 @@ function ReviewStep({
         <ReviewField label="Village / City" value={dash(draft.villageCity)} />
         <ReviewField label="Branch" value={dash(draft.branch)} />
         <ReviewField label="College / University" value={dash(draft.college)} />
-        <ReviewField label="Lead By" value={counselorName} />
+        <ReviewField label="Master's" value={dash(draft.mastersDetails)} />
+        <ReviewField label="Lead by Employee" value={counselorName} />
+        <ReviewField label="Referred By" value={dash(draft.referredBy)} />
       </ReviewSection>
 
-      <ReviewSection title="02 Academic">
-        <ReviewField label="CGPA" value={draft.cgpa ? draft.cgpa.toFixed(2) : "—"} />
-        <ReviewField label="English test" value={dash(english.englishTest)} />
+      <ReviewSection title="02 Academic" onEdit={() => onNavigateStep(1)}>
+        <ReviewField
+          label="Bachelor's CGPA"
+          value={draft.bachelorsCgpa != null ? Number(draft.bachelorsCgpa).toFixed(2) : draft.cgpa ? draft.cgpa.toFixed(2) : "—"}
+        />
+        <ReviewField
+          label="Master's CGPA"
+          value={draft.mastersCgpa != null ? Number(draft.mastersCgpa).toFixed(2) : "—"}
+        />
+        <ReviewField label="English test" value={dash(draft.englishTest ?? english.englishTest)} />
         <ReviewField
           label="English score"
-          value={english.englishScore != null ? String(english.englishScore) : "—"}
+          value={formatReviewEnglishScore()}
         />
         <ReviewField label="German grade" value={draft.germanGrade != null ? draft.germanGrade.toFixed(1) : "—"} />
         <ReviewField label="GRE" value={draft.gre != null ? String(draft.gre) : "—"} />
         <ReviewField label="German language" value={dash(draft.germanLanguage)} />
       </ReviewSection>
 
-      <ReviewSection title="03 Account" hint="Sensitive credentials. Reveal only when you need them.">
+      <ReviewSection title="03 Account" hint="Sensitive credentials. Reveal only when you need them." onEdit={() => onNavigateStep(2)}>
         <ReviewField label="Gmail ID" value={dash(draft.gmailId)} />
         <PasswordField label="Gmail password" value={canEditSecrets ? draft.gmailPassword : ""} />
+        <ReviewField label="Recovery Gmail 1" value={dash(draft.recoveryGmail1)} />
+        <ReviewField label="Recovery Gmail 2" value={dash(draft.recoveryGmail2)} />
+        <ReviewField label="Recovery Gmail 3" value={dash(draft.recoveryGmail3)} />
         <ReviewField label="Recovery Number 1" value={dash(draft.recoveryNumber1 || draft.recoveryNumber)} />
         <ReviewField label="Recovery Number 2" value={dash(draft.recoveryNumber2)} />
         <ReviewField label="Recovery Number 3" value={dash(draft.recoveryNumber3)} />
@@ -1141,7 +1528,7 @@ function ReviewStep({
         <ReviewField label="2-step verification" value={draft.twoStep ? "Enabled" : "Off"} />
       </ReviewSection>
 
-      <ReviewSection title="04 Application">
+      <ReviewSection title="04 Application" onEdit={() => onNavigateStep(3)}>
         <ReviewField label="Application status" value={draft.status} />
         <ReviewField label="Lead type" value={draft.leadType} />
         <ReviewField
@@ -1160,6 +1547,7 @@ function ReviewStep({
         title="German-Specific Details"
         hint="Germany-specific. Optional — blank fields do not block registration."
         wide
+        onEdit={() => onNavigateStep(4)}
       >
         <ReviewField label="APS Username" value={dash(draft.apsUsername)} />
         <PasswordField label="APS Password" value={canEditSecrets ? (draft.apsPassword ?? "") : ""} />
@@ -1170,7 +1558,7 @@ function ReviewStep({
         <ReviewField label="Student Dorm Status" value={dash(draft.studentDorm)} />
       </ReviewSection>
 
-      <ReviewSection title="05 Payment">
+      <ReviewSection title="05 Payment" onEdit={() => onNavigateStep(5)}>
         <ReviewField label="Total fee" value={formatINR(payment.totalFee)} />
         <ReviewField label="Discount" value={formatINR(payment.discount)} />
         <ReviewField label="Amount due" value={formatINR(payment.payable)} />
@@ -1179,7 +1567,7 @@ function ReviewStep({
         <ReviewField label="Payment status" value={payment.status} />
       </ReviewSection>
 
-      <ReviewSection title="06 Documents" hint={`Checklist for ${draft.country}. Saved when the student is created.`} wide>
+      <ReviewSection title="06 Documents" hint={`Checklist for ${draft.country}. Saved when the student is created.`} wide onEdit={() => onNavigateStep(6)}>
         {documents.map((rule) => (
           <div key={rule.type} className="flex items-baseline justify-between gap-3 rounded-lg border bg-card px-3 py-2">
             <div>

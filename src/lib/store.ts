@@ -390,11 +390,19 @@ export const useAppStore = create<AppStore>()(
         const settled = settlePayment(data.totalFee, data.discount ?? 0, data.paidAmount ?? 0);
         const paymentStatus: PaymentStatus = settled.status;
         const recovery1 = data.recoveryNumber1 || data.recoveryNumber || "";
+        const bCgpa = data.bachelorsCgpa !== undefined && data.bachelorsCgpa !== null ? Number(data.bachelorsCgpa) : data.cgpa;
         const student: Student = {
           ...data,
           id,
+          cgpa: bCgpa,
+          bachelorsCgpa: bCgpa,
           recoveryNumber: recovery1,
           recoveryNumber1: recovery1,
+          recoveryGmail1: data.recoveryGmail1 || undefined,
+          recoveryGmail2: data.recoveryGmail2 || undefined,
+          recoveryGmail3: data.recoveryGmail3 || undefined,
+          referredBy: data.referredBy?.trim() || undefined,
+          mastersDetails: data.mastersDetails?.trim() || undefined,
           totalFee: settled.totalFee,
           discount: settled.discount,
           paidAmount: settled.paidAmount,
@@ -450,9 +458,11 @@ export const useAppStore = create<AppStore>()(
           const moneyTouched =
             patch.totalFee !== undefined || patch.paidAmount !== undefined || patch.discount !== undefined;
           const rec1 = patch.recoveryNumber1 !== undefined ? patch.recoveryNumber1 : (patch.recoveryNumber !== undefined ? patch.recoveryNumber : undefined);
+          const bCgpa = patch.bachelorsCgpa !== undefined ? patch.bachelorsCgpa : patch.cgpa;
           let next: Student = {
             ...prev,
             ...patch,
+            ...(bCgpa !== undefined ? { cgpa: bCgpa, bachelorsCgpa: bCgpa } : {}),
             ...(rec1 !== undefined ? { recoveryNumber: rec1, recoveryNumber1: rec1 } : {}),
             updatedAt: now,
           };
@@ -1651,8 +1661,11 @@ export const useAppStore = create<AppStore>()(
           if (state.students && state.students.length > 0) {
             state.students = state.students.map((st) => {
               const recovery1 = st.recoveryNumber1 || st.recoveryNumber || st.phone1;
+              const bCgpa = st.bachelorsCgpa ?? st.cgpa;
               return {
                 ...st,
+                cgpa: bCgpa,
+                bachelorsCgpa: bCgpa,
                 recoveryNumber: recovery1,
                 recoveryNumber1: recovery1,
                 state: st.state ?? "Andhra Pradesh",

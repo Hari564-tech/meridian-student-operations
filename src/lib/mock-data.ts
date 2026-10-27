@@ -414,6 +414,7 @@ export function createSeed(now = Date.now()) {
     const rec1 = phone(r);
     const rec2 = r() > 0.4 ? phone(r) : undefined;
     const rec3 = r() > 0.7 ? phone(r) : undefined;
+    const cgpaVal = Number((6.8 + r() * 2.6).toFixed(2));
     return {
       id,
       name,
@@ -427,12 +428,16 @@ export function createSeed(now = Date.now()) {
       villageCity: loc.villageCity,
       branch,
       college: pick(r, COLLEGES),
+      referredBy: r() > 0.6 ? pick(r, ["Venkat Rao", "Kiran Mai", "Sunil Reddy", "B2B Partner"]) : undefined,
+      mastersDetails: r() > 0.7 ? "M.Tech in Software Engineering" : undefined,
       employeeId: assigned.id,
       status,
       paymentStatus: paymentFromAmounts(totalFee, paidAmount, discount),
       createdAt: iso(createdAt),
       updatedAt: iso(Math.max(createdAt, updatedAt)),
-      cgpa: Number((6.8 + r() * 2.6).toFixed(2)),
+      cgpa: cgpaVal,
+      bachelorsCgpa: cgpaVal,
+      mastersCgpa: r() > 0.8 ? Number((7.2 + r() * 2.3).toFixed(2)) : undefined,
       ielts: r() > 0.15 ? Number((6 + r() * 2.5).toFixed(1)) : undefined,
       toefl: country === "USA" || r() > 0.7 ? Math.round(78 + r() * 30) : undefined,
       duolingo: r() > 0.8 ? Math.round(105 + r() * 40) : undefined,
@@ -445,6 +450,9 @@ export function createSeed(now = Date.now()) {
       recoveryNumber1: rec1,
       recoveryNumber2: rec2,
       recoveryNumber3: rec3,
+      recoveryGmail1: `recovery.${slug}@gmail.com`,
+      recoveryGmail2: r() > 0.5 ? `backup.${slug}@gmail.com` : undefined,
+      recoveryGmail3: r() > 0.8 ? `alt.${slug}@gmail.com` : undefined,
       device: pick(r, DEVICES),
       twoStep: r() > 0.35,
       apsUsername: germany ? `aps.${slug.split(".")[0]}` : undefined,

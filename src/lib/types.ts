@@ -116,30 +116,194 @@ export function isTenDigitPhone(value: string) {
   return /^\d{10}$/.test(toTenDigits(value)) && toTenDigits(value).length === 10 && value.replace(/\D/g, "").length <= 12;
 }
 
+export const ENGLISH_TESTS = [
+  "IELTS",
+  "TOEFL",
+  "IELTS & TOEFL",
+  "Duolingo",
+  "PTE",
+  "Other",
+  "Not Taken",
+] as const;
+export type EnglishTest = (typeof ENGLISH_TESTS)[number];
+
+export function isValidEmail(email: string) {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
+}
+
 export function englishFromStudent(student: {
+  englishTest?: EnglishTest | string;
+  englishScore?: number;
+  ielts?: number;
+  toefl?: number;
+  duolingo?: number;
+  pte?: number;
+  otherEnglishTestName?: string;
+  otherEnglishTestScore?: number;
+}): {
   englishTest?: EnglishTest;
   englishScore?: number;
   ielts?: number;
   toefl?: number;
   duolingo?: number;
-}): { englishTest?: EnglishTest; englishScore?: number } {
-  if (student.englishTest) {
-    return { englishTest: student.englishTest, englishScore: student.englishScore };
+  pte?: number;
+  otherEnglishTestName?: string;
+  otherEnglishTestScore?: number;
+} {
+  if (
+    student.englishTest === "IELTS & TOEFL" ||
+    (typeof student.ielts === "number" && typeof student.toefl === "number" && student.englishTest !== "IELTS" && student.englishTest !== "TOEFL")
+  ) {
+    return {
+      englishTest: "IELTS & TOEFL",
+      ielts: student.ielts,
+      toefl: student.toefl,
+    };
   }
-  if (typeof student.ielts === "number") return { englishTest: "IELTS", englishScore: student.ielts };
-  if (typeof student.toefl === "number") return { englishTest: "TOEFL", englishScore: student.toefl };
-  if (typeof student.duolingo === "number") return { englishTest: "Duolingo", englishScore: student.duolingo };
+  if (student.englishTest === "Other") {
+    return {
+      englishTest: "Other",
+      englishScore: student.englishScore ?? student.otherEnglishTestScore,
+      otherEnglishTestName: student.otherEnglishTestName,
+      otherEnglishTestScore: student.otherEnglishTestScore ?? student.englishScore,
+    };
+  }
+  if (student.englishTest === "Not Taken") {
+    return { englishTest: "Not Taken" };
+  }
+  if (student.englishTest) {
+    return {
+      englishTest: student.englishTest as EnglishTest,
+      englishScore: student.englishScore,
+      ielts: student.ielts,
+      toefl: student.toefl,
+      duolingo: student.duolingo,
+      pte: student.pte,
+      otherEnglishTestName: student.otherEnglishTestName,
+      otherEnglishTestScore: student.otherEnglishTestScore,
+    };
+  }
+  if (typeof student.ielts === "number" && typeof student.toefl === "number") {
+    return { englishTest: "IELTS & TOEFL", ielts: student.ielts, toefl: student.toefl };
+  }
+  if (typeof student.ielts === "number") return { englishTest: "IELTS", englishScore: student.ielts, ielts: student.ielts };
+  if (typeof student.toefl === "number") return { englishTest: "TOEFL", englishScore: student.toefl, toefl: student.toefl };
+  if (typeof student.duolingo === "number") return { englishTest: "Duolingo", englishScore: student.duolingo, duolingo: student.duolingo };
+  if (typeof student.pte === "number") return { englishTest: "PTE", englishScore: student.pte, pte: student.pte };
   return {};
 }
 
 /** Keep legacy score fields in sync so eligibility still reads IELTS / TOEFL / Duolingo. */
-export function scoresForEnglish(test: EnglishTest | undefined, score: number | undefined) {
+export function scoresForEnglish(
+  test: EnglishTest | string | undefined,
+  score?: number | undefined,
+  extra?: {
+    ielts?: number;
+    toefl?: number;
+    duolingo?: number;
+    pte?: number;
+    otherName?: string;
+    otherScore?: number;
+  },
+) {
+  if (test === "IELTS & TOEFL") {
+    return {
+      englishTest: test,
+      englishScore: extra?.ielts ?? score,
+      ielts: extra?.ielts,
+      toefl: extra?.toefl,
+      duolingo: undefined,
+      pte: undefined,
+      otherEnglishTestName: undefined,
+      otherEnglishTestScore: undefined,
+    };
+  }
+  if (test === "IELTS") {
+    const val = extra?.ielts ?? score;
+    return {
+      englishTest: test,
+      englishScore: val,
+      ielts: val,
+      toefl: undefined,
+      duolingo: undefined,
+      pte: undefined,
+      otherEnglishTestName: undefined,
+      otherEnglishTestScore: undefined,
+    };
+  }
+  if (test === "TOEFL") {
+    const val = extra?.toefl ?? score;
+    return {
+      englishTest: test,
+      englishScore: val,
+      ielts: undefined,
+      toefl: val,
+      duolingo: undefined,
+      pte: undefined,
+      otherEnglishTestName: undefined,
+      otherEnglishTestScore: undefined,
+    };
+  }
+  if (test === "Duolingo") {
+    const val = extra?.duolingo ?? score;
+    return {
+      englishTest: test,
+      englishScore: val,
+      ielts: undefined,
+      toefl: undefined,
+      duolingo: val,
+      pte: undefined,
+      otherEnglishTestName: undefined,
+      otherEnglishTestScore: undefined,
+    };
+  }
+  if (test === "PTE") {
+    const val = extra?.pte ?? score;
+    return {
+      englishTest: test,
+      englishScore: val,
+      ielts: undefined,
+      toefl: undefined,
+      duolingo: undefined,
+      pte: val,
+      otherEnglishTestName: undefined,
+      otherEnglishTestScore: undefined,
+    };
+  }
+  if (test === "Other") {
+    const val = extra?.otherScore ?? score;
+    return {
+      englishTest: test,
+      englishScore: val,
+      ielts: undefined,
+      toefl: undefined,
+      duolingo: undefined,
+      pte: undefined,
+      otherEnglishTestName: extra?.otherName,
+      otherEnglishTestScore: val,
+    };
+  }
+  if (test === "Not Taken") {
+    return {
+      englishTest: test,
+      englishScore: undefined,
+      ielts: undefined,
+      toefl: undefined,
+      duolingo: undefined,
+      pte: undefined,
+      otherEnglishTestName: undefined,
+      otherEnglishTestScore: undefined,
+    };
+  }
   return {
     englishTest: test,
     englishScore: score,
-    ielts: test === "IELTS" ? score : undefined,
-    toefl: test === "TOEFL" ? score : undefined,
-    duolingo: test === "Duolingo" ? score : undefined,
+    ielts: test === "IELTS" ? score : extra?.ielts,
+    toefl: test === "TOEFL" ? score : extra?.toefl,
+    duolingo: test === "Duolingo" ? score : extra?.duolingo,
+    pte: test === "PTE" ? score : extra?.pte,
+    otherEnglishTestName: extra?.otherName,
+    otherEnglishTestScore: extra?.otherScore,
   };
 }
 
@@ -223,9 +387,6 @@ export interface B2BConsultancyRecord {
 }
 
 export const GERMAN_LEVELS = ["None", "A1", "A2", "B1", "B2", "C1"] as const;
-
-export const ENGLISH_TESTS = ["IELTS", "TOEFL", "PTE", "Duolingo", "Cambridge English"] as const;
-export type EnglishTest = (typeof ENGLISH_TESTS)[number];
 
 export const DOCUMENT_CATEGORIES = [
   "Identity",
@@ -380,11 +541,18 @@ export interface Student {
   createdAt: string;
   updatedAt: string;
   cgpa: number;
-  englishTest?: EnglishTest;
+  bachelorsCgpa?: number;
+  mastersCgpa?: number;
+  referredBy?: string;
+  mastersDetails?: string;
+  englishTest?: EnglishTest | string;
   englishScore?: number;
   ielts?: number;
   toefl?: number;
   duolingo?: number;
+  pte?: number;
+  otherEnglishTestName?: string;
+  otherEnglishTestScore?: number;
   germanGrade?: number;
   gre?: number;
   germanLanguage: string;
@@ -396,6 +564,10 @@ export interface Student {
   recoveryNumber1?: string;
   recoveryNumber2?: string;
   recoveryNumber3?: string;
+  /** Three independent recovery gmail addresses */
+  recoveryGmail1?: string;
+  recoveryGmail2?: string;
+  recoveryGmail3?: string;
   device: string;
   twoStep: boolean;
   apsUsername?: string;
@@ -429,6 +601,15 @@ export function getStudentRecoveryNumbers(student?: Partial<Student> | null) {
   const recovery2 = student.recoveryNumber2 || "";
   const recovery3 = student.recoveryNumber3 || "";
   return { recovery1, recovery2, recovery3 };
+}
+
+export function getStudentRecoveryGmails(student?: Partial<Student> | null) {
+  if (!student) return { recoveryGmail1: "", recoveryGmail2: "", recoveryGmail3: "" };
+  return {
+    recoveryGmail1: student.recoveryGmail1 || "",
+    recoveryGmail2: student.recoveryGmail2 || "",
+    recoveryGmail3: student.recoveryGmail3 || "",
+  };
 }
 
 export interface University {

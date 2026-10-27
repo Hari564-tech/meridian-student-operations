@@ -1,49 +1,47 @@
 # Active Context
 
-## Current Phase: Overall Document Receipt Status & Students List Column - Fully Verified & Delivered
+## Current Phase: APS Applied By, University Type & Student Payment Management — Fully Verified & Delivered
 
 ### Completed Tasks
-1. **Editable Overall Document Receipt Status Card (`src/components/documents/document-receipt-card.tsx`)**:
-   - Prominently placed at the top of Student Profile → Documents tab, directly above the document completion summary (`<Card className="p-5">`).
-   - Compact dropdown offering exact values: `Not Received`, `Partially Received`, `Completely Received`.
-   - Distinct semantic status badges:
-     - `Not Received`: neutral gray (`bg-secondary text-muted-foreground ring-border`) with file-question icon.
-     - `Partially Received`: amber/orange (`bg-amber-500/10 text-amber-700 ring-amber-500/20`) with clock icon.
-     - `Completely Received`: green (`bg-emerald-500/10 text-emerald-700 ring-emerald-500/20`) with check-circle icon.
-     - `No Requirements Configured`: neutral muted badge when 0 requirements are configured.
-   - Interactive `[Save Status]` button:
-     - Enabled only when a change is made from the currently saved status.
-     - Displays loading spinner (`Loader2`) during asynchronous save.
-     - Triggers toast: `"Document receipt status updated successfully."`.
-     - Robust error handling with retry support.
-2. **Strict Separation of Concerns & State Management (`src/lib/documents.ts`, `src/lib/types.ts`)**:
-   - `DOCUMENT_RECEIPT_STATUSES = ["Not Received", "Partially Received", "Completely Received"] as const`.
-   - `Student.documentReceiptStatus?: DocumentReceiptStatus` persisted in Zustand store and `localStorage`.
-   - Explicit employee selection is maintained and never overwritten by checklist file review operations.
-   - Intelligent fallback defaults (`getStudentDocumentReceiptStatus`) compute default receipt status if unassigned based on required documents uploaded/verified.
-3. **Audit History & Activity Log**:
-   - On save, logs audit trail entry with action `STATUS_CHANGE`, module `Students`, staff actor (`Nagaraju` / `Staff`), previous value, new value, and timestamp.
-4. **Document Status Column in Students List (`src/pages/students-page.tsx`)**:
-   - Available to both Employee and Admin workspaces.
-   - Positioned directly beside Application Status.
-   - Displays semantic badge and secondary required document count (`X / Y documents`).
-   - Clickable: clicking the Document Status cell navigates directly to `Student Profile → Documents` (`?tab=documents`).
-   - Configurable in `Columns` visibility dropdown, enabled by default.
-   - Document Status Filter Select with options: `All Document Statuses`, `Not Received`, `Partially Received`, `Completely Received`.
-   - Dynamic CSV Export incorporates `documentStatus` and `documentCount`.
-   - Mobile card displays `DocumentReceiptBadge` with document count.
-5. **Deep-linking & Navigation (`src/pages/student-detail.tsx`)**:
-   - Profile header displays `DocumentReceiptBadge` with required count.
-   - URL search parameter `?tab=documents` triggers automatic activation of Documents tab.
-6. **Automated Verification**:
-   - Unit/Integration test suite `scripts/document-receipt-status.test.mjs`: 7/7 tests passed (100%).
-   - Regression test suites `scripts/student-profile-enhancements.test.mjs` & `scripts/german-details.test.mjs`: 100% passed.
-   - End-to-end Playwright suite `scripts/verify-document-receipt-workflow.mjs`: 100% passed (15/15 assertions verified).
-   - `npm test`: 68 tests passing across all suites.
-   - `npm run typecheck`: 0 errors.
-
-### Captured Artifacts & Visual Proof
-- `document-receipt-card-documents-tab.png`: Prominent card in Documents tab with dropdown, badge, save button, and success toast.
-- `students-table-document-status-column.png`: Students table showing the new Document Status column with badges and counts.
-- `students-table-document-status-filter.png`: Filtered Students table showing exact matching for "Completely Received".
-
+1. **German-Specific Details — APS Applied By**:
+   - Added dropdown selector with exact options `Student` and `By Employee` in Step 05 *German-Specific Details* of Add/Edit Student forms (`src/pages/student-form.tsx`).
+   - Persisted as `apsAppliedBy` on `Student` model (`src/lib/types.ts`).
+   - Pre-populated when editing existing students (`/admin/students/:id/edit`).
+   - Displayed in Step 08 *Review* and in the student profile Overview *Germany-Specific Status* card with semantic badge and quick editing dialog (`QuickGermanyStatusDialog`).
+   - Preserved across step navigation, form draft caching, and browser refreshes.
+   - Visible for Germany-bound students and decoupled from Lead by Employee / Lead Type.
+2. **Application Section — University Type**:
+   - Added dropdown selector with exact options `Public University` and `Private University` in Step 04 *Application* of Add/Edit Student forms (`src/pages/student-form.tsx`).
+   - Configurable at the student record level (`student.universityType`) and per individual application (`application.universityType`).
+   - Displayed in Step 08 *Review* and in the student profile Overview *Personal* card.
+   - Applications tab table includes an interactive **Type** column with dropdown selection, allowing counselors to update university type per application with immediate persistence and toast feedback.
+3. **Student Profile — Update Payment Modal & Transaction Management (`src/components/payments/update-payment-dialog.tsx`)**:
+   - Prominent `Update Payment` buttons on profile header, actions dropdown, Overview payment card, Payments tab, and global Payments page.
+   - **Top Financial Summary Strip**: Total Fees, Discount, Total Amount Previously Paid with record count, Current Due Before Payment, and Payment Status badge.
+   - **Non-Overwriting Payment History Table**: Complete date-wise transactions (Date, Amount, Method, Reference / ID, Recorded By, Notes, Receipt, Status), sorted latest first.
+   - **Record New Payment Form**:
+     - Payment Amount * (> 0, currency formatted ₹, auto-calculated live remaining due).
+     - Payment Date * (native date input, defaults to today YYYY-MM-DD, editable, saved separately from creation timestamp).
+     - Payment Method (`Cash`, `Bank Transfer`, `UPI`, `Card`, `Other`; when `Other` selected, prompts for custom method).
+     - Transaction / Reference ID input.
+     - Notes input.
+     - Screenshot / Receipt file attachment with preview badge.
+   - **Live Remaining Due Calculation Card**:
+     - `Remaining Due After Payment = Current Due Before Payment - Current Payment Amount`.
+     - Color-coded: emerald for ₹0, primary blue for partial balance, amber warning notice if overpayment entered.
+     - Settled notice: displays *"All dues are settled!"* if current due before payment is ₹0.
+   - **Success View**:
+     - Confirmed receipt summary with Student name, Payment Amount, Payment Date, Total Amount Paid, and Remaining Due.
+     - Quick actions: `[View Payment History]`, `[Record Another Payment]`, and `[Done]`.
+   - **Reconciliation & Store Integration (`src/lib/payment.ts`, `src/lib/store.ts`)**:
+     - `calculateRemainingAfterPayment` guarantees non-negative balances and handles edge cases.
+     - `getStudentPaymentDetails` unifies transaction aggregation without double-counting legacy initial payments.
+     - `recordStudentPayment` updates `paymentTransactions`, `student.paidAmount`, `student.paymentStatus`, `payment.remaining`, and logs audit event `PAYMENT_UPDATE`.
+     - Seeded initial transactions for Rahul Kumar (OCT26_001): ₹20,000 on 2026-10-01 and ₹15,000 on 2026-10-05 against ₹75,000 total fees.
+4. **Verification & Quality Gates**:
+   - `node --test scripts/aps-university-payment.test.mjs`: 7/7 unit tests passed.
+   - `npm test`: 59/59 tests passed across 18 suites.
+   - `npm run typecheck`: Exit code 0, 0 TypeScript errors.
+   - `npm run build`: Exit code 0, production build packaged.
+   - `scripts/verify-aps-university-payment.mjs`: 100% passed in Playwright, generating screenshots for all steps and modal interactions.
+   - Pushed cleanly to GitHub `origin/main` (`commit 3b26446`).

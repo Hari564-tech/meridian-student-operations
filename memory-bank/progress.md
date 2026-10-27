@@ -32,6 +32,16 @@
 - [x] Column Settings visibility integration for Document Status
 - [x] Dedicated Playwright E2E Suite (`scripts/verify-document-receipt-workflow.mjs`: 100% passed)
 - [x] System default colour configured to white (Light theme default in store, pure white background `#ffffff`, system theme defaults to white, meta theme-color `#ffffff`)
-- [x] 100% Passing Tests (`npm test`: 68 tests passing; `npm run typecheck`: 0 errors; `npm run build`: 0 errors)
-
-
+- [x] Admin Intake Management and B2B Consultancy settings
+- [x] Student Location Cascading dropdowns (State -> District -> Village/City) and 3 Recovery Numbers
+- [x] Add Student enhancements: Referred By, Master's details, Master's CGPA, Dual English tests, and 3 Recovery Gmails
+- [x] German-Specific Details: APS Applied By dropdown (`Student`, `By Employee`) in Add Student, Edit Student, Review, and Student Profile
+- [x] Application Section: University Type dropdown (`Public University`, `Private University`) in Add/Edit Student form, Student Profile Overview, and per-application editing in Applications tab
+- [x] Student Profile: Dedicated Update Payment Button (Header, Overview, Payments Tab, Global Payments page)
+- [x] Update Payment Modal: Real-time Financial Summary strip (Total Fees, Total Previously Paid, Current Due Before Payment, Payment Status)
+- [x] Update Payment Modal: Live Remaining Due calculation card with color-coded balance, overpayment alert, and full settlement notice
+- [x] Non-overwriting date-wise Payment History table with payment methods, references, notes, and receipt upload/downloads
+- [x] Payment Success View with receipt breakdown and quick actions
+- [x] Synchronized calculation and reconciliation preventing double-counting of initial payments
+- [x] Full Test & Build Suite: 100% Unit Tests, 59/59 global tests, 0 Typecheck errors, 0 Build errors
+- [x] Verified in Playwright E2E and pushed to GitHub `origin/main`

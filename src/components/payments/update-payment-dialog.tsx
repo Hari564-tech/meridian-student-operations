@@ -31,6 +31,7 @@ import {
 import {
   AlertCircle,
   ArrowRight,
+  Calculator,
   Calendar,
   CheckCircle2,
   Clock,
@@ -248,9 +249,9 @@ export function UpdatePaymentDialog({
           </div>
 
           {/* Top Financial Summary Metric Strip */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 mt-3.5">
+          <div className="grid grid-cols-2 sm:grid-cols-5 gap-2.5 mt-3.5">
             <div className="rounded-lg border bg-secondary/30 p-2.5">
-              <p className="text-[11px] font-medium text-muted-foreground">Total Fees</p>
+              <p className="text-[11px] font-medium text-muted-foreground">Total Fee</p>
               <p className="text-sm font-semibold tracking-tight text-foreground">
                 {formatINR(financialSummary.totalFee)}
               </p>
@@ -262,7 +263,17 @@ export function UpdatePaymentDialog({
             </div>
 
             <div className="rounded-lg border bg-secondary/30 p-2.5">
-              <p className="text-[11px] font-medium text-muted-foreground">Total Previously Paid</p>
+              <p className="text-[11px] font-medium text-muted-foreground">Net Payable</p>
+              <p className="text-sm font-semibold tracking-tight text-foreground">
+                {formatINR(financialSummary.totalPayable)}
+              </p>
+              <p className="text-[10px] text-muted-foreground">
+                Fee − Discount
+              </p>
+            </div>
+
+            <div className="rounded-lg border bg-secondary/30 p-2.5">
+              <p className="text-[11px] font-medium text-muted-foreground">Previously Paid</p>
               <p className="text-sm font-semibold tracking-tight text-emerald-600">
                 {formatINR(financialSummary.totalPaid)}
               </p>
@@ -335,8 +346,14 @@ export function UpdatePaymentDialog({
                   <span className="font-medium text-foreground">{lastPaymentResult.method}</span>
                 </div>
                 <div className="flex justify-between items-center pt-2 border-t">
-                  <span className="text-muted-foreground">Total Amount Paid:</span>
+                  <span className="text-muted-foreground">Net Payable:</span>
                   <span className="font-semibold text-foreground">
+                    {formatINR(financialSummary.totalPayable)}
+                  </span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-muted-foreground">Total Amount Paid (Updated):</span>
+                  <span className="font-semibold text-emerald-600">
                     {formatINR(lastPaymentResult.totalPaid)}
                   </span>
                 </div>
@@ -349,6 +366,13 @@ export function UpdatePaymentDialog({
                   >
                     {formatINR(lastPaymentResult.remaining)}
                   </span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-muted-foreground">New Payment Status:</span>
+                  <PaymentBadge status={lastPaymentResult.remaining === 0 ? "Paid" : "Partially Paid"} />
+                </div>
+                <div className="pt-2 border-t text-[11px] text-muted-foreground font-mono bg-secondary/30 p-2 rounded">
+                  Formula verified: ({formatINR(financialSummary.totalPayable)} Net Payable − {formatINR(lastPaymentResult.totalPaid)} Total Paid) = {formatINR(lastPaymentResult.remaining)} Remaining Due
                 </div>
               </div>
 
@@ -569,14 +593,18 @@ export function UpdatePaymentDialog({
                     <CreditCard className="size-3.5 text-primary" />
                     Live Remaining Due Calculation
                   </span>
-                  {numAmount > 0 && calculation.remainingDueAfterPayment === 0 && (
+                  {numAmount > 0 && calculation.remainingDueAfterPayment === 0 ? (
                     <Badge variant="default" className="bg-emerald-600 text-white text-[10px]">
                       Fully Settled After Payment
                     </Badge>
-                  )}
+                  ) : numAmount > 0 ? (
+                    <Badge variant="outline" className="text-[10px] border-primary/40 text-primary">
+                      Status after save: {calculation.newStatus}
+                    </Badge>
+                  ) : null}
                 </div>
 
-                <div className="grid grid-cols-3 gap-2 pt-3 text-center">
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-3 text-center">
                   <div>
                     <p className="text-[10px] uppercase font-semibold text-muted-foreground">
                       Current Due
@@ -597,7 +625,16 @@ export function UpdatePaymentDialog({
 
                   <div>
                     <p className="text-[10px] uppercase font-semibold text-muted-foreground">
-                      Remaining After Payment
+                      Total Paid After Update
+                    </p>
+                    <p className="text-sm font-bold text-emerald-600">
+                      {formatINR(calculation.totalPaidAfterPayment)}
+                    </p>
+                  </div>
+
+                  <div>
+                    <p className="text-[10px] uppercase font-semibold text-muted-foreground">
+                      Remaining Due
                     </p>
                     <p
                       className={`text-base font-extrabold ${
@@ -608,6 +645,24 @@ export function UpdatePaymentDialog({
                     >
                       {formatINR(calculation.remainingDueAfterPayment)}
                     </p>
+                  </div>
+                </div>
+
+                {/* Mathematical Formula Callout */}
+                <div className="mt-3.5 pt-3 border-t border-border/60 text-left space-y-1.5" data-testid="payment-math-formula-box">
+                  <div className="flex flex-wrap items-center gap-1.5 text-[11px] font-semibold text-muted-foreground">
+                    <Calculator className="size-3.5 text-primary" />
+                    <span>Calculation Formula:</span>
+                    <span className="font-mono text-[11px] text-foreground bg-secondary/60 px-2 py-0.5 rounded">
+                      Remaining Due = (Total Fee − Discount) − (Previously Paid + Paying Now)
+                    </span>
+                  </div>
+                  <div className="text-[11px] text-muted-foreground bg-secondary/20 rounded p-2 border border-border/40 font-mono">
+                    <span className="text-foreground font-medium">Live Computation:</span>{" "}
+                    ({formatINR(calculation.totalFee)} − {formatINR(calculation.discount)}) − ({formatINR(calculation.previousPaid)} + {formatINR(calculation.payingNow)}) ={" "}
+                    <span className={calculation.remainingDueAfterPayment === 0 ? "text-emerald-600 font-bold" : "text-amber-600 font-bold"}>
+                      {formatINR(calculation.remainingDueAfterPayment)} Remaining Due
+                    </span>
                   </div>
                 </div>
               </div>

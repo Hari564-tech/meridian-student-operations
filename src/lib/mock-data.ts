@@ -280,7 +280,7 @@ export function createSeed(now = Date.now()) {
       title: i === 0 ? "Senior Counselor" : "Counselor",
       department: "Admissions",
       status: "Active",
-      canViewPayments: false,
+      canViewPayments: true,
       lastActive: iso(now - (12 + i * 18) * 60000),
       joinedAt: iso(now - (640 - i * 24) * 86400000),
       avatarHue: (i * 37 + 12) % 360,

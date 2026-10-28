@@ -1,11 +1,11 @@
 import { useAppStore } from "@/lib/store";
 import type { User } from "@/lib/types";
 
-/** Admins always see Payments. Employees see it only when an admin turns it on. */
+/** Admins always see Payments. Employees see it by default unless an admin explicitly turned it off (canViewPayments === false). */
 export function canViewPayments(user: Pick<User, "role" | "canViewPayments"> | null | undefined) {
   if (!user) return false;
   if (user.role === "admin") return true;
-  return user.canViewPayments === true;
+  return user.canViewPayments !== false;
 }
 
 /** Reads the live employee record so an admin's toggle applies without a stale login copy. */

@@ -170,9 +170,84 @@ describe("Abroad Aspirants: APS Applied By, University Type & Payment Management
     assert.ok(dialogContent.includes("Update Student Payment"), "Dialog title present");
     assert.ok(dialogContent.includes("Current Due Before Payment"), "Financial summary metric present");
     assert.ok(dialogContent.includes("Live Remaining Due Calculation"), "Live remaining calculation present");
-    assert.ok(dialogContent.includes("Remaining After Payment"), "Remaining after payment label present");
+    assert.ok(dialogContent.includes("Total Paid After Update"), "Total Paid After Update metric present");
+    assert.ok(dialogContent.includes("Remaining Due"), "Remaining due label present");
+    assert.ok(dialogContent.includes("payment-math-formula-box"), "Mathematical formula callout present");
     assert.ok(dialogContent.includes("Payment History"), "Payment history table present");
     assert.ok(dialogContent.includes("Save Payment"), "Save Payment submit button present");
     assert.ok(dialogContent.includes("All dues are settled!"), "Settled notification present");
+  });
+
+  test("src/lib/access.ts allows employees to access payments by default and supports admin override", () => {
+    const accessContent = fs.readFileSync(path.join(root, "src/lib/access.ts"), "utf-8");
+    assert.ok(
+      accessContent.includes("user.canViewPayments !== false"),
+      "canViewPayments allows employees by default unless explicitly set to false",
+    );
+    assert.ok(
+      accessContent.includes('user.role === "admin"'),
+      "canViewPayments grants admins access unconditionally",
+    );
+
+    // Dynamic execution of the access evaluation rule
+    const canViewPaymentsFn = (user) => {
+      if (!user) return false;
+      if (user.role === "admin") return true;
+      return user.canViewPayments !== false;
+    };
+
+    // Admin always allowed
+    assert.equal(canViewPaymentsFn({ role: "admin" }), true);
+    assert.equal(canViewPaymentsFn({ role: "admin", canViewPayments: false }), true);
+
+    // Employee allowed by default
+    assert.equal(canViewPaymentsFn({ role: "employee" }), true);
+    assert.equal(canViewPaymentsFn({ role: "employee", canViewPayments: true }), true);
+    assert.equal(canViewPaymentsFn({ role: "employee", canViewPayments: undefined }), true);
+
+    // Employee denied only if explicitly disabled
+    assert.equal(canViewPaymentsFn({ role: "employee", canViewPayments: false }), false);
+
+    // Null/undefined user
+    assert.equal(canViewPaymentsFn(null), false);
+    assert.equal(canViewPaymentsFn(undefined), false);
+  });
+
+  test("Payment mathematical formulas correctly compute fee, discount, previous paid, paying now, and remaining due", async () => {
+    const { calculateRemainingAfterPayment, settlePayment } = await import("../src/lib/payment.ts");
+
+    // Scenario: Total Fee ₹75,000, Discount ₹10,000, Previously Paid ₹35,000, Paying ₹15,000
+    // Total Payable = 75,000 - 10,000 = 65,000
+    // Current Due Before Payment = 65,000 - 35,000 = 30,000
+    // Paying Now = 15,000
+    // Total Paid After Payment = 35,000 + 15,000 = 50,000
+    // Remaining Due After Payment = 65,000 - 50,000 = 15,000
+    const res = calculateRemainingAfterPayment(75000, 10000, 35000, 15000);
+    assert.equal(res.totalFee, 75000);
+    assert.equal(res.discount, 10000);
+    assert.equal(res.totalPayable, 65000);
+    assert.equal(res.previousPaid, 35000);
+    assert.equal(res.currentDueBeforePayment, 30000);
+    assert.equal(res.payingNow, 15000);
+    assert.equal(res.totalPaidAfterPayment, 50000);
+    assert.equal(res.remainingDueAfterPayment, 15000);
+    assert.equal(res.newStatus, "Partially Paid");
+    assert.ok(res.formulaText.includes("75,000"));
+    assert.ok(res.formulaText.includes("10,000"));
+    assert.ok(res.formulaText.includes("35,000"));
+    assert.ok(res.formulaText.includes("15,000"));
+
+    // Settling full remaining ₹15,000
+    const resFull = calculateRemainingAfterPayment(75000, 10000, 50000, 15000);
+    assert.equal(resFull.totalPaidAfterPayment, 65000);
+    assert.equal(resFull.remainingDueAfterPayment, 0);
+    assert.equal(resFull.newStatus, "Paid");
+
+    // settlePayment consistency
+    const settled = settlePayment(75000, 10000, 50000);
+    assert.equal(settled.payable, 65000);
+    assert.equal(settled.paidAmount, 50000);
+    assert.equal(settled.remaining, 15000);
+    assert.equal(settled.status, "Partially Paid");
   });
 });

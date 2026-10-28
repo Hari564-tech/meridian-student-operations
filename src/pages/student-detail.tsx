@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "@tanstack/react-router";
 import {
+  Calculator,
   CreditCard,
   FileText,
   GraduationCap,
@@ -85,6 +86,7 @@ export function StudentDetailPage({ studentId }: { studentId: string }) {
   const { base, role } = useWorkspace();
   const currentUser = useAppStore((s) => s.currentUser);
   const showPayments = useCanViewPayments();
+  const canUpdatePayment = role === "admin" || role === "employee" || showPayments;
   const canViewSecrets = role === "admin" || (!!currentUser && student?.employeeId === currentUser.id);
   const canEditStatus = role === "admin" || role === "employee";
   const navigate = useNavigate();
@@ -282,7 +284,7 @@ export function StudentDetailPage({ studentId }: { studentId: string }) {
                 ))}
               </SelectContent>
             </Select>
-            {showPayments && (
+            {canUpdatePayment && (
               <Button
                 variant="outline"
                 onClick={() => setPaymentDialogOpen(true)}
@@ -314,7 +316,7 @@ export function StudentDetailPage({ studentId }: { studentId: string }) {
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
-                {showPayments && (
+                {canUpdatePayment && (
                   <DropdownMenuItem onClick={() => setPaymentDialogOpen(true)}>
                     <CreditCard className="size-4" /> Update Payment
                   </DropdownMenuItem>
@@ -346,7 +348,7 @@ export function StudentDetailPage({ studentId }: { studentId: string }) {
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
             <StatusBadge status={student.status} />
-            {showPayments && <PaymentBadge status={student.paymentStatus} />}
+            {canUpdatePayment && <PaymentBadge status={student.paymentStatus} />}
           </div>
           <p className="mt-1 text-sm text-muted-foreground">
             {student.branch} · {student.college}
@@ -378,11 +380,14 @@ export function StudentDetailPage({ studentId }: { studentId: string }) {
             )}
           </p>
         </Card>
-        {showPayments && (
-          <Card className="p-4">
-            <p className="text-xs text-muted-foreground">Payment</p>
+        {canUpdatePayment && (
+          <Card className="p-4" data-testid="top-payment-summary-card">
+            <div className="flex items-center justify-between">
+              <p className="text-xs text-muted-foreground">Payment</p>
+              <PaymentBadge status={student.paymentStatus} />
+            </div>
             <p className="mt-1 text-sm font-semibold">
-              {formatINR(student.paidAmount)} / {formatINR(student.totalFee)}
+              {formatINR(student.paidAmount)} / {formatINR(Math.max(0, student.totalFee - student.discount))}
             </p>
             <Progress value={Math.min(100, pct)} className="mt-2" />
           </Card>
@@ -400,7 +405,7 @@ export function StudentDetailPage({ studentId }: { studentId: string }) {
           <TabsTrigger value="overview">Overview</TabsTrigger>
           <TabsTrigger value="academic">Academic</TabsTrigger>
           <TabsTrigger value="applications">Applications</TabsTrigger>
-          {showPayments && <TabsTrigger value="payments">Payments</TabsTrigger>}
+          {canUpdatePayment && <TabsTrigger value="payments">Payments</TabsTrigger>}
           <TabsTrigger value="documents">
             Documents
             {receiptSummary.totalRequired > 0 && (
@@ -645,8 +650,8 @@ export function StudentDetailPage({ studentId }: { studentId: string }) {
               <Field label="2-step verification" value={student.twoStep ? "Enabled" : "Off"} />
             </CardContent>
           </Card>
-          {showPayments && (
-          <Card>
+          {canUpdatePayment && (
+          <Card data-testid="overview-payment-card">
             <CardHeader className="flex flex-row items-center justify-between pb-2">
               <CardTitle className="flex items-center gap-2">
                 <CreditCard className="size-4" /> Payment
@@ -655,20 +660,26 @@ export function StudentDetailPage({ studentId }: { studentId: string }) {
                 size="xs"
                 variant="outline"
                 onClick={() => setPaymentDialogOpen(true)}
-                className="gap-1 border-emerald-600/40 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-950/20"
+                className="gap-1 border-emerald-600/40 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-950/20 font-medium"
                 data-testid="overview-update-payment-btn"
               >
-                <CreditCard className="size-3.5" /> Update Payment
+                <CreditCard className="size-3.5 text-emerald-600" /> Update Payment
               </Button>
             </CardHeader>
-            <CardContent className="grid grid-cols-2 gap-3 text-sm">
+            <CardContent className="grid grid-cols-2 sm:grid-cols-3 gap-3 text-sm">
               <Field label="Total fee" value={formatINR(student.totalFee)} />
-              <Field label="Collected" value={formatINR(student.paidAmount)} />
               <Field label="Discount" value={formatINR(student.discount)} />
-              <Field label="Remaining" value={formatINR(remaining)} />
+              <Field label="Net payable" value={formatINR(Math.max(0, student.totalFee - student.discount))} />
+              <Field label="Collected (Paid)" value={formatINR(student.paidAmount)} />
+              <Field label="Remaining due" value={formatINR(remaining)} />
               <Field label="Payment status" value={student.paymentStatus} />
-              <Field label="Applications" value={`${applications.length} · ${offers} offers`} />
             </CardContent>
+            <div className="border-t px-6 py-2.5 bg-secondary/15 text-[11px] text-muted-foreground font-mono flex flex-wrap items-center justify-between gap-1">
+              <span>Formula: Remaining Due = (Total Fee − Discount) − Collected</span>
+              <span className="font-semibold text-foreground">
+                ({formatINR(student.totalFee)} − {formatINR(student.discount)}) − {formatINR(student.paidAmount)} = {formatINR(remaining)} Due
+              </span>
+            </div>
           </Card>
           )}
           <Card className="lg:col-span-2">
@@ -780,7 +791,7 @@ export function StudentDetailPage({ studentId }: { studentId: string }) {
           </Card>
         </TabsContent>
 
-        {showPayments && (
+        {canUpdatePayment && (
         <TabsContent value="payments">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between pb-3">
@@ -803,7 +814,7 @@ export function StudentDetailPage({ studentId }: { studentId: string }) {
               </Button>
             </CardHeader>
             <CardContent className="space-y-5">
-              <div className="grid gap-3 sm:grid-cols-4">
+              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
                 <div className="rounded-lg border bg-secondary/30 p-3">
                   <p className="text-xs text-muted-foreground">Total Fee</p>
                   <p className="text-base font-semibold text-foreground">{formatINR(student.totalFee)}</p>
@@ -813,7 +824,11 @@ export function StudentDetailPage({ studentId }: { studentId: string }) {
                   <p className="text-base font-semibold text-emerald-600">{formatINR(student.discount)}</p>
                 </div>
                 <div className="rounded-lg border bg-secondary/30 p-3">
-                  <p className="text-xs text-muted-foreground">Collected</p>
+                  <p className="text-xs text-muted-foreground">Net Payable</p>
+                  <p className="text-base font-semibold text-foreground">{formatINR(Math.max(0, student.totalFee - student.discount))}</p>
+                </div>
+                <div className="rounded-lg border bg-secondary/30 p-3">
+                  <p className="text-xs text-muted-foreground">Collected (Paid)</p>
                   <p className="text-base font-semibold text-foreground">{formatINR(student.paidAmount)}</p>
                 </div>
                 <div className="rounded-lg border bg-secondary/30 p-3">
@@ -821,6 +836,22 @@ export function StudentDetailPage({ studentId }: { studentId: string }) {
                   <p className={`text-base font-semibold ${remaining > 0 ? "text-amber-600" : "text-emerald-600"}`}>
                     {formatINR(remaining)}
                   </p>
+                </div>
+              </div>
+
+              <div className="rounded-lg border bg-secondary/20 p-3 text-xs flex flex-wrap items-center justify-between gap-2" data-testid="payments-tab-formula-banner">
+                <div className="flex items-center gap-2">
+                  <Calculator className="size-4 text-primary" />
+                  <span className="font-semibold text-foreground">Maths Formula:</span>
+                  <span className="font-mono text-muted-foreground">
+                    Remaining Due = (Total Fee − Discount) − Collected
+                  </span>
+                </div>
+                <div className="font-mono font-medium text-foreground bg-background/80 px-2.5 py-1 rounded border border-border/60">
+                  ({formatINR(student.totalFee)} − {formatINR(student.discount)}) − {formatINR(student.paidAmount)} ={" "}
+                  <span className={remaining > 0 ? "text-amber-600 font-bold" : "text-emerald-600 font-bold"}>
+                    {formatINR(remaining)} Due
+                  </span>
                 </div>
               </div>
 

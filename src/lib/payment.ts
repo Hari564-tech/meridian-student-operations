@@ -58,9 +58,11 @@ export function calculateRemainingAfterPayment(
   const prevPaid = Math.max(0, Math.round(Number(previousPaid) || 0));
   const currentDueBeforePayment = Math.max(0, totalPayable - prevPaid);
   const now = Math.max(0, Math.round(Number(payingNow) || 0));
-  const remainingDueAfterPayment = Math.max(0, currentDueBeforePayment - now);
+  const totalPaidAfterPayment = prevPaid + now;
+  const remainingDueAfterPayment = Math.max(0, totalPayable - totalPaidAfterPayment);
   const isOverpayment = now > currentDueBeforePayment && currentDueBeforePayment > 0;
   const isFullyPaid = currentDueBeforePayment <= 0;
+  const settledAfter = settlePayment(fee, disc, totalPaidAfterPayment);
 
   return {
     totalFee: fee,
@@ -69,9 +71,12 @@ export function calculateRemainingAfterPayment(
     previousPaid: prevPaid,
     currentDueBeforePayment,
     payingNow: now,
+    totalPaidAfterPayment,
     remainingDueAfterPayment,
+    newStatus: settledAfter.status,
     isOverpayment,
     isFullyPaid,
+    formulaText: `(Total Fee ₹${fee.toLocaleString("en-IN")} - Discount ₹${disc.toLocaleString("en-IN")}) - (Previously Paid ₹${prevPaid.toLocaleString("en-IN")} + Paying Now ₹${now.toLocaleString("en-IN")}) = ₹${remainingDueAfterPayment.toLocaleString("en-IN")} Remaining Due`,
   };
 }
 
@@ -89,8 +94,8 @@ export interface StudentFinancialSummary {
 
 /**
  * Returns consistent, unified date-wise payment transactions and balances for a student.
- * If transactions have not been recorded yet but the student has a paidAmount > 0,
- * synthesizes an initial registration transaction for historical continuity without double-counting.
+ * If transactions do not fully cover student.paidAmount, synthesizes an initial registration
+ * transaction for historical continuity without double-counting.
  */
 export function getStudentPaymentDetails(
   student: Student,
@@ -103,25 +108,24 @@ export function getStudentPaymentDetails(
 
   let transactions = [...rawTxns];
 
-  // If no transactions exist in the store yet, but student already has an initial payment recorded,
-  // synthesize a transparent initial transaction so the payment history table is not empty.
-  if (transactions.length === 0 && student.paidAmount > 0) {
+  // Reconcile any unbacked initial payment so table sum matches total paid
+  const txnsTotalBefore = transactions.reduce((sum, t) => sum + t.amount, 0);
+  if (student.paidAmount > txnsTotalBefore) {
+    const unbacked = student.paidAmount - txnsTotalBefore;
     const regDate = student.createdAt ? student.createdAt.slice(0, 10) : new Date().toISOString().slice(0, 10);
-    transactions = [
-      {
-        id: `TXN-INIT-${student.id}`,
-        studentId: student.id,
-        amount: student.paidAmount,
-        paymentDate: regDate,
-        method: "Bank Transfer",
-        reference: `INIT-${student.id}`,
-        notes: "Initial registration payment",
-        recordedBy: counselorName ?? "Admissions Counselor",
-        createdAt: student.createdAt || new Date().toISOString(),
-        updatedAt: student.createdAt || new Date().toISOString(),
-        status: "Completed",
-      },
-    ];
+    transactions.push({
+      id: `TXN-INIT-${student.id}`,
+      studentId: student.id,
+      amount: unbacked,
+      paymentDate: regDate,
+      method: "Bank Transfer",
+      reference: `INIT-${student.id}`,
+      notes: "Initial registration payment",
+      recordedBy: counselorName ?? "Admissions Counselor",
+      createdAt: student.createdAt || new Date().toISOString(),
+      updatedAt: student.createdAt || new Date().toISOString(),
+      status: "Completed",
+    });
   }
 
   // Always sort latest payment date first

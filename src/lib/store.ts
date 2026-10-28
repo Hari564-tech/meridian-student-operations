@@ -456,6 +456,26 @@ export const useAppStore = create<AppStore>()(
             },
             ...s.payments,
           ],
+          paymentTransactions:
+            settled.paidAmount > 0
+              ? [
+                  {
+                    id: `TXN-INIT-${id}`,
+                    studentId: id,
+                    amount: settled.paidAmount,
+                    paymentDate: now.slice(0, 10),
+                    method: "Bank Transfer",
+                    reference: `INIT-${id}`,
+                    notes: "Initial registration payment",
+                    recordedBy: s.currentUser?.name || "Counselor",
+                    recordedById: s.currentUser?.id,
+                    createdAt: now,
+                    updatedAt: now,
+                    status: "Completed",
+                  },
+                  ...s.paymentTransactions,
+                ]
+              : s.paymentTransactions,
           notifications: [
             notice("New student registered", `${student.name} (${student.id}) was added.`, `/${s.currentUser?.role === "employee" ? "employee" : "admin"}/students/${student.id}`, "student"),
             ...s.notifications,
@@ -680,12 +700,16 @@ export const useAppStore = create<AppStore>()(
           (t) => t.studentId === input.studentId && t.status !== "Voided",
         );
 
+        const currentTxnsTotal = currentTxns.reduce((sum, t) => sum + t.amount, 0);
+        const baselinePaid = Math.max(currentTxnsTotal, Number(student.paidAmount) || 0);
+
         const backfillTxns: PaymentTransaction[] = [];
-        if (currentTxns.length === 0 && student.paidAmount > 0) {
+        if (baselinePaid > currentTxnsTotal) {
+          const unbackedAmount = baselinePaid - currentTxnsTotal;
           backfillTxns.push({
             id: `TXN-INIT-${student.id}`,
             studentId: student.id,
-            amount: student.paidAmount,
+            amount: unbackedAmount,
             paymentDate: student.createdAt ? student.createdAt.slice(0, 10) : nowIso.slice(0, 10),
             method: "Bank Transfer",
             reference: `INIT-${student.id}`,
@@ -718,9 +742,8 @@ export const useAppStore = create<AppStore>()(
           status: "Completed",
         };
 
-        const allStudentTxns = [...currentTxns, ...backfillTxns, newTxn];
-        const newTotalPaid = allStudentTxns.reduce((sum, t) => sum + t.amount, 0);
-        const settled = settlePayment(student.totalFee, student.discount, newTotalPaid);
+        const newTotalPaid = baselinePaid + newTxn.amount;
+        const settled = settlePayment(student.totalFee, student.discount || 0, newTotalPaid);
 
         set((s) => ({
           paymentTransactions: [newTxn, ...backfillTxns, ...s.paymentTransactions],

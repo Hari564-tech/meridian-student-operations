@@ -53,19 +53,24 @@ export function PaymentsPage() {
         cell: ({ row }) => formatINR(figures(row.original).totalFee),
       },
       {
+        accessorKey: "discount",
+        header: "Discount",
+        cell: ({ row }) => formatINR(figures(row.original).discount),
+      },
+      {
+        id: "payable",
+        header: "Net payable",
+        cell: ({ row }) => formatINR(figures(row.original).payable),
+      },
+      {
         accessorKey: "initialPayment",
-        header: "Initial payment",
+        header: "Collected (Paid)",
         cell: ({ row }) => formatINR(figures(row.original).paidAmount),
       },
       {
         accessorKey: "remaining",
         header: "Remaining",
         cell: ({ row }) => formatINR(figures(row.original).remaining),
-      },
-      {
-        accessorKey: "discount",
-        header: "Discount",
-        cell: ({ row }) => formatINR(figures(row.original).discount),
       },
       {
         accessorKey: "status",
